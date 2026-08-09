@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from functools import lru_cache
@@ -19,6 +20,8 @@ from hushmark_core.taxonomy_gen import ENTITY_TYPES, TAXONOMY
 DETERMINISTIC_ENTITY_TYPES = [
     entity_type for entity_type in ENTITY_TYPES if TAXONOMY[entity_type]["layer"] == "deterministic"
 ]
+_ALPHA_TOKEN = re.compile(r"[^\W\d_]+", re.UNICODE)
+_NER_NEUTRAL_TOKENS = frozenset({"and", "ile", "or", "the", "ve", "veya"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -52,6 +55,24 @@ def resolve_overlaps(entities: list[Entity]) -> list[Entity]:
         if not any(spans_overlap(candidate, current) for current in selected):
             selected.append(candidate)
     return sorted(selected, key=lambda entity: (entity.start, entity.end, entity.type))
+
+
+def requires_ner(text: str, deterministic_entities: list[Entity]) -> bool:
+    """Skip model inference only for provably neutral residual text.
+
+    Deterministic values are blanked without changing offsets. Remaining digits may be a
+    date of birth or another NER-owned value, while any non-stopword alphabetic token may
+    be a name, address, organization, or special-category reference.
+    """
+
+    residual = list(text)
+    for entity in deterministic_entities:
+        if entity.layer == "deterministic":
+            residual[entity.start : entity.end] = " " * (entity.end - entity.start)
+    residual_text = "".join(residual)
+    if any(character.isdigit() for character in residual_text):
+        return True
+    return any(token not in _NER_NEUTRAL_TOKENS for token in _ALPHA_TOKEN.findall(residual_text))
 
 
 class DetectionEngine:
@@ -115,7 +136,10 @@ class DetectionEngine:
                 )
             )
         query_threshold = min(self._ner_thresholds.values(), default=self._ner_threshold)
-        for ner_result in self._ner_backend.predict(text, query_threshold):
+        ner_results = (
+            self._ner_backend.predict(text, query_threshold) if requires_ner(text, entities) else []
+        )
+        for ner_result in ner_results:
             if ner_result.entity_type not in TAXONOMY:
                 raise ValueError(
                     f"NER backend emitted unknown entity type: {ner_result.entity_type}"

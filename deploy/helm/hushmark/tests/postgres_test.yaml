@@ -1,0 +1,24 @@
+suite: bundled PostgreSQL security
+templates:
+  - templates/postgres.yaml
+set:
+  postgres.enabled: true
+tests:
+  - it: uses the pinned Alpine image postgres identity
+    asserts:
+      - equal:
+          path: spec.template.spec.securityContext.runAsNonRoot
+          value: true
+        documentIndex: 1
+      - equal:
+          path: spec.template.spec.securityContext.runAsUser
+          value: 70
+        documentIndex: 1
+      - equal:
+          path: spec.template.spec.securityContext.fsGroup
+          value: 70
+        documentIndex: 1
+      - equal:
+          path: spec.template.spec.containers[0].env[0].value
+          value: /var/lib/postgresql/data/pgdata
+        documentIndex: 1

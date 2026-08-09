@@ -1,0 +1,14 @@
+suite: console workload security
+templates:
+  - templates/console.yaml
+tests:
+  - it: runs console as non-root with a read-only filesystem
+    asserts:
+      - equal:
+          path: spec.template.spec.securityContext.runAsNonRoot
+          value: true
+        documentIndex: 0
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.readOnlyRootFilesystem
+          value: true
+        documentIndex: 0

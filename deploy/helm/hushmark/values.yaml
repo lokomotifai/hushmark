@@ -1,0 +1,112 @@
+nameOverride: ""
+fullnameOverride: ""
+imagePullSecrets: []
+
+core:
+  replicaCount: 1
+  image:
+    repository: hushmark/core
+    tag: 0.1.0-model
+    digest: ""
+    pullPolicy: IfNotPresent
+  model:
+    baked: true
+    existingClaim: ""
+  service:
+    port: 8000
+  resources:
+    requests:
+      cpu: "1"
+      memory: 2Gi
+    limits:
+      cpu: "4"
+      memory: 6Gi
+  nerBackend: onnx
+  nerThreshold: 0.55
+
+gateway:
+  replicaCount: 1
+  image:
+    repository: hushmark/gateway
+    tag: 0.1.0
+    digest: ""
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 8080
+  existingSecret: hushmark-gateway
+  apiKeyKey: api-keys
+  openaiApiKeyKey: openai-api-key
+  anthropicApiKeyKey: anthropic-api-key
+  openaiUpstream: https://api.openai.com/v1
+  anthropicUpstream: https://api.anthropic.com/v1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
+console:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: hushmark/console
+    tag: 0.1.0
+    digest: ""
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 3000
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+enterprise:
+  enabled: false
+  licenseSecret: hushmark-license
+  licenseKey: license.json
+  publicKeyKey: public.pem
+  databaseSecret: hushmark-postgres
+  databaseUrlKey: database-url
+  adminEmail: admin@hushmark.local
+  adminSecret: hushmark-admin
+  adminPasswordKey: password
+  kms:
+    kind: vault
+    keyId: hushmark
+    secret: hushmark-kms
+    tokenKey: token
+    vaultAddress: http://vault:8200
+    vaultTransitMount: transit
+
+postgres:
+  enabled: false
+  image:
+    repository: postgres
+    tag: 16.10-alpine
+    digest: sha256:029660641a0cfc575b14f336ba448fb8a75fd595d42e1fa316b9fb4378742297
+    pullPolicy: IfNotPresent
+  existingSecret: hushmark-postgres
+  passwordKey: password
+  database: hushmark
+  username: hushmark
+  persistence:
+    enabled: true
+    size: 8Gi
+    storageClass: ""
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
+networkPolicy:
+  enabled: true

@@ -1,0 +1,28 @@
+suite: core workload security and boundary
+templates:
+  - templates/core.yaml
+tests:
+  - it: runs core as non-root with a read-only filesystem
+    asserts:
+      - equal:
+          path: spec.template.spec.securityContext.runAsNonRoot
+          value: true
+        documentIndex: 0
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.readOnlyRootFilesystem
+          value: true
+        documentIndex: 0
+  - it: keeps core on ClusterIP
+    asserts:
+      - equal:
+          path: spec.type
+          value: ClusterIP
+        documentIndex: 1
+  - it: renders digest references when supplied
+    set:
+      core.image.digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: hushmark/core@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+        documentIndex: 0

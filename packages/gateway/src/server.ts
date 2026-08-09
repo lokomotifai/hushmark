@@ -73,7 +73,11 @@ export function buildServer(dependencies: ServerDependencies): FastifyInstance {
   });
 
   app.addHook("onRequest", (request, _reply, done) => {
-    if (request.url === "/healthz" || request.url.startsWith("/admin/")) {
+    if (
+      request.url === "/healthz" ||
+      request.url === "/readyz" ||
+      request.url.startsWith("/admin/")
+    ) {
       done();
       return;
     }
@@ -87,6 +91,11 @@ export function buildServer(dependencies: ServerDependencies): FastifyInstance {
   });
 
   app.get("/healthz", () => ({ status: "ok" }));
+  app.get("/readyz", async (_request, reply) => {
+    const ready = (await core.ready?.()) ?? true;
+    void reply.status(ready ? 200 : 503);
+    return { status: ready ? "ready" : "loading" };
+  });
   app.post("/v1/chat/completions", async (request, reply) =>
     handleProvider(
       request,

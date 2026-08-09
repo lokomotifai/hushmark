@@ -44,3 +44,62 @@ jobs:
       - run: uv run python tools/codegen/generate.py --check
       - run: uv run python tools/codegen/claims_lint.py
       - run: ./scripts/check-build-context.sh
+
+  packaging:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+      - uses: azure/setup-helm@v4
+        with:
+          version: v4.2.0
+      - run: uv sync --frozen
+      - run: helm plugin install https://github.com/helm-unittest/helm-unittest --version v1.1.1 --verify=false
+      - run: ./scripts/check-packaging.sh
+      - run: helm unittest deploy/helm/hushmark
+
+  kind:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          curl -fsSLo kind https://kind.sigs.k8s.io/dl/v0.31.0/kind-linux-amd64
+          curl -fsSLo kind.sha256 https://kind.sigs.k8s.io/dl/v0.31.0/kind-linux-amd64.sha256sum
+          sed 's#kind-linux-amd64#kind#' kind.sha256 | sha256sum --check
+          sudo install -m 0755 kind /usr/local/bin/kind
+      - uses: azure/setup-helm@v4
+        with:
+          version: v4.2.0
+      - run: ./scripts/e2e-kind.sh
+
+  performance-tripwire:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+      - run: pnpm install --frozen-lockfile
+      - run: uv sync --frozen
+      - run: pnpm --filter @hushmark/shared build && pnpm --filter @hushmark/gateway build
+      - run: |
+          curl -fsSLo k6.tar.gz https://github.com/grafana/k6/releases/download/v2.1.0/k6-v2.1.0-linux-amd64.tar.gz
+          curl -fsSLo checksums.txt https://github.com/grafana/k6/releases/download/v2.1.0/k6-v2.1.0-checksums.txt
+          grep 'k6-v2.1.0-linux-amd64.tar.gz' checksums.txt | sed 's#k6-v2.1.0-linux-amd64.tar.gz#k6.tar.gz#' | sha256sum --check
+          tar -xzf k6.tar.gz
+          sudo install -m 0755 k6-v2.1.0-linux-amd64/k6 /usr/local/bin/k6
+      - run: ./scripts/perf-local-stack.sh
+        env:
+          CORE_P95_MS: "300"
+          GATEWAY_P95_MS: "500"
+          STREAM_OVERHEAD_P95_MS: "600"
+          HUSHMARK_PERF_LIMIT_MULTIPLIER: "2"

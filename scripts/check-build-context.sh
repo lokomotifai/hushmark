@@ -3,6 +3,7 @@ set -euo pipefail
 
 repo_dir=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 ignore_file="$repo_dir/deploy/docker/.dockerignore"
+docker_ignore_file="$repo_dir/.dockerignore"
 canary="HUSHMARK-CORPUS-"
 canary+="CANARY-7f3a9d"
 
@@ -10,6 +11,17 @@ required=(research briefs hushmark PLAN.md PLAN-BRIEF.md EXECUTABLE-PLAN-PROMPT.
 for path in "${required[@]}"; do
   if ! grep -Fxq "$path" "$ignore_file"; then
     echo "Missing build-context exclusion: $path" >&2
+    exit 1
+  fi
+done
+
+if [[ $(head -n 1 "$docker_ignore_file") != "**" ]]; then
+  echo "Root Docker build context is not deny-by-default." >&2
+  exit 1
+fi
+for path in research briefs hushmark PLAN.md PLAN-BRIEF.md EXECUTABLE-PLAN-PROMPT.md; do
+  if grep -Fxq "!$path" "$docker_ignore_file"; then
+    echo "Private path is allowlisted in root Docker context: $path" >&2
     exit 1
   fi
 done

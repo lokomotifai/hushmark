@@ -1,0 +1,84 @@
+name: supply-chain
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: core
+            dockerfile: deploy/docker/core.Dockerfile
+            target: slim
+          - name: gateway
+            dockerfile: deploy/docker/gateway.Dockerfile
+            target: runtime
+          - name: console
+            dockerfile: deploy/docker/console.Dockerfile
+            target: runtime
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v4
+      - uses: docker/setup-buildx-action@v4.2.0
+        with:
+          driver-opts: network=host
+      - uses: sigstore/cosign-installer@v4.1.2
+        with:
+          cosign-release: v3.0.6
+      - name: Install Syft and Grype
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/anchore/syft/v1.50.0/install.sh | sudo sh -s -- -b /usr/local/bin v1.50.0
+          curl -sSfL https://raw.githubusercontent.com/anchore/grype/v0.116.1/install.sh | sudo sh -s -- -b /usr/local/bin v0.116.1
+      - name: Start local registry
+        run: docker run -d --name registry -p 5000:5000 registry:2@sha256:a3d8aaa63ed8681a604f1dea0aa03f100d5895b6a58ace528858a7b332415373
+      - name: Build reproducible multi-arch image
+        run: |
+          docker buildx build \
+            --platform linux/amd64,linux/arm64 \
+            --target "${{ matrix.target }}" \
+            --file "${{ matrix.dockerfile }}" \
+            --tag "localhost:5000/hushmark/${{ matrix.name }}:0.1.0" \
+            --provenance=mode=max \
+            --sbom=true \
+            --push .
+      - name: Generate and attach SBOMs
+        run: |
+          image="localhost:5000/hushmark/${{ matrix.name }}:0.1.0"
+          digest="$(docker buildx imagetools inspect "$image" | awk '/^Digest:/ {print $2; exit}')"
+          image_ref="${image}@${digest}"
+          syft "$image_ref" \
+            -o "cyclonedx-json=${{ matrix.name }}.cdx.json" \
+            -o "spdx-json=${{ matrix.name }}.spdx.json"
+          export COSIGN_PASSWORD=hushmark-ci-ephemeral
+          cosign generate-key-pair
+          cosign sign --yes --allow-insecure-registry --key cosign.key "$image_ref"
+          cosign attest --yes --allow-insecure-registry --key cosign.key \
+            --type cyclonedx --predicate "${{ matrix.name }}.cdx.json" "$image_ref"
+          cosign attest --yes --allow-insecure-registry --key cosign.key \
+            --type spdxjson --predicate "${{ matrix.name }}.spdx.json" "$image_ref"
+          cosign verify --allow-insecure-registry --key cosign.pub "$image_ref"
+          cosign verify-attestation --allow-insecure-registry --key cosign.pub \
+            --type cyclonedx "$image_ref"
+      - name: Enforce vulnerability and corpus budgets
+        run: |
+          image="localhost:5000/hushmark/${{ matrix.name }}:0.1.0"
+          digest="$(docker buildx imagetools inspect "$image" | awk '/^Digest:/ {print $2; exit}')"
+          image_ref="${image}@${digest}"
+          grype "$image_ref" --output json --file "${{ matrix.name }}.grype.json"
+          grype "$image_ref" --only-fixed --fail-on critical
+          docker pull "$image"
+          ./scripts/check-image-canary.sh "$image"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sbom-${{ matrix.name }}
+          path: |
+            ${{ matrix.name }}.cdx.json
+            ${{ matrix.name }}.spdx.json
+            ${{ matrix.name }}.grype.json

@@ -1,0 +1,129 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "hushmark.fullname" . }}-gateway
+  labels:
+    {{- include "hushmark.labels" . | nindent 4 }}
+    app.kubernetes.io/component: gateway
+spec:
+  replicas: {{ .Values.gateway.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "hushmark.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: gateway
+  template:
+    metadata:
+      labels:
+        {{- include "hushmark.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: gateway
+    spec:
+      automountServiceAccountToken: false
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: gateway
+          image: {{ include "hushmark.image" .Values.gateway.image | quote }}
+          imagePullPolicy: {{ .Values.gateway.image.pullPolicy }}
+          command: ["node"]
+          {{- if .Values.enterprise.enabled }}
+          args: ["dist/cli.js"]
+          {{- else }}
+          args: ["node_modules/@hushmark/gateway/dist/cli.js"]
+          {{- end }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+            readOnlyRootFilesystem: true
+          env:
+            - name: HUSHMARK_GATEWAY_HOST
+              value: 0.0.0.0
+            - name: HUSHMARK_GATEWAY_PORT
+              value: {{ .Values.gateway.service.port | quote }}
+            - name: HUSHMARK_CORE_URL
+              value: {{ printf "http://%s-core:%v" (include "hushmark.fullname" .) .Values.core.service.port | quote }}
+            - name: HUSHMARK_POLICY_PATH
+              value: /etc/hushmark/policy.yaml
+            - name: HUSHMARK_OPENAI_UPSTREAM
+              value: {{ .Values.gateway.openaiUpstream | quote }}
+            - name: HUSHMARK_ANTHROPIC_UPSTREAM
+              value: {{ .Values.gateway.anthropicUpstream | quote }}
+            - name: HUSHMARK_API_KEYS
+              valueFrom: { secretKeyRef: { name: {{ .Values.gateway.existingSecret }}, key: {{ .Values.gateway.apiKeyKey }} } }
+            - name: HUSHMARK_OPENAI_API_KEY
+              valueFrom: { secretKeyRef: { name: {{ .Values.gateway.existingSecret }}, key: {{ .Values.gateway.openaiApiKeyKey }}, optional: true } }
+            - name: HUSHMARK_ANTHROPIC_API_KEY
+              valueFrom: { secretKeyRef: { name: {{ .Values.gateway.existingSecret }}, key: {{ .Values.gateway.anthropicApiKeyKey }}, optional: true } }
+            {{- if .Values.enterprise.enabled }}
+            - name: HUSHMARK_DATABASE_URL
+              valueFrom: { secretKeyRef: { name: {{ .Values.enterprise.databaseSecret }}, key: {{ .Values.enterprise.databaseUrlKey }} } }
+            - name: HUSHMARK_LICENSE_FILE
+              value: /run/hushmark/license/{{ .Values.enterprise.licenseKey }}
+            - name: HUSHMARK_LICENSE_PUBLIC_KEY_FILE
+              value: /run/hushmark/license/{{ .Values.enterprise.publicKeyKey }}
+            - name: HUSHMARK_ADMIN_EMAIL
+              value: {{ .Values.enterprise.adminEmail | quote }}
+            - name: HUSHMARK_ADMIN_PASSWORD
+              valueFrom: { secretKeyRef: { name: {{ .Values.enterprise.adminSecret }}, key: {{ .Values.enterprise.adminPasswordKey }} } }
+            - name: HUSHMARK_KMS_KIND
+              value: {{ .Values.enterprise.kms.kind | quote }}
+            - name: HUSHMARK_KMS_KEY_ID
+              value: {{ .Values.enterprise.kms.keyId | quote }}
+            {{- if eq .Values.enterprise.kms.kind "vault" }}
+            - name: HUSHMARK_VAULT_ADDR
+              value: {{ .Values.enterprise.kms.vaultAddress | quote }}
+            - name: HUSHMARK_VAULT_TRANSIT_MOUNT
+              value: {{ .Values.enterprise.kms.vaultTransitMount | quote }}
+            - name: HUSHMARK_VAULT_TOKEN
+              valueFrom: { secretKeyRef: { name: {{ .Values.enterprise.kms.secret }}, key: {{ .Values.enterprise.kms.tokenKey }} } }
+            {{- end }}
+            {{- end }}
+          ports:
+            - { name: http, containerPort: {{ .Values.gateway.service.port }} }
+          livenessProbe:
+            httpGet: { path: /healthz, port: http }
+            periodSeconds: 15
+          readinessProbe:
+            httpGet: { path: /readyz, port: http }
+            periodSeconds: 10
+            failureThreshold: 12
+          resources:
+            {{- toYaml .Values.gateway.resources | nindent 12 }}
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+            - { name: policy, mountPath: /etc/hushmark, readOnly: true }
+            {{- if .Values.enterprise.enabled }}
+            - { name: license, mountPath: /run/hushmark/license, readOnly: true }
+            {{- end }}
+      volumes:
+        - name: tmp
+          emptyDir: { sizeLimit: 64Mi }
+        - name: policy
+          configMap: { name: {{ include "hushmark.fullname" . }}-policy }
+        {{- if .Values.enterprise.enabled }}
+        - name: license
+          secret: { secretName: {{ .Values.enterprise.licenseSecret }} }
+        {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "hushmark.fullname" . }}-gateway
+  labels:
+    {{- include "hushmark.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.gateway.service.type }}
+  selector:
+    {{- include "hushmark.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: gateway
+  ports:
+    - name: http
+      port: {{ .Values.gateway.service.port }}
+      targetPort: http

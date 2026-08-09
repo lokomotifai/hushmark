@@ -1,0 +1,14 @@
+Hushmark {{ .Chart.AppVersion }} was rendered for release {{ .Release.Name }}.
+
+Gateway service:
+  {{ include "hushmark.fullname" . }}-gateway:{{ .Values.gateway.service.port }}
+{{- if .Values.console.enabled }}
+Console service:
+  {{ include "hushmark.fullname" . }}-console:{{ .Values.console.service.port }}
+{{- end }}
+
+The core service is intentionally ClusterIP-only. Supply all referenced Secrets before install.
+{{- if not .Values.enterprise.enabled }}
+Enterprise administration is disabled. Set enterprise.enabled=true only after providing the
+license, database, administrator, and KMS Secrets documented in the install guide.
+{{- end }}

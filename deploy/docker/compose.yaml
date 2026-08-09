@@ -1,0 +1,140 @@
+name: hushmark-evaluation
+
+x-readonly-service: &readonly-service
+  restart: unless-stopped
+  read_only: true
+  security_opt:
+    - no-new-privileges:true
+  tmpfs:
+    - /tmp:size=64m,mode=1777
+
+services:
+  postgres:
+    image: postgres:16.10-alpine@sha256:029660641a0cfc575b14f336ba448fb8a75fd595d42e1fa316b9fb4378742297
+    environment:
+      POSTGRES_DB: hushmark
+      POSTGRES_USER: hushmark
+      POSTGRES_PASSWORD: hushmark-evaluation-only
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ../../packages/gateway-enterprise/drizzle/0000_initial.sql:/docker-entrypoint-initdb.d/0000_initial.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hushmark -d hushmark"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  vault:
+    image: hashicorp/vault:1.21@sha256:4e33b126a59c0c333b76fb4e894722462659a6bec7c48c9ee8cea56fccfd2569
+    cap_add: [IPC_LOCK]
+    environment:
+      VAULT_DEV_ROOT_TOKEN_ID: hushmark-evaluation-token
+      VAULT_DEV_LISTEN_ADDRESS: 0.0.0.0:8200
+      VAULT_ADDR: http://127.0.0.1:8200
+    command: server -dev
+    healthcheck:
+      test: ["CMD", "vault", "status"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  vault-init:
+    image: hashicorp/vault:1.21@sha256:4e33b126a59c0c333b76fb4e894722462659a6bec7c48c9ee8cea56fccfd2569
+    depends_on:
+      vault:
+        condition: service_healthy
+    environment:
+      VAULT_ADDR: http://vault:8200
+      VAULT_TOKEN: hushmark-evaluation-token
+    command:
+      ["sh", "-ec", "vault secrets enable transit || true; vault write -f transit/keys/hushmark"]
+    restart: "no"
+
+  core:
+    <<: *readonly-service
+    image: hushmark/core:0.1.0-model
+    build:
+      context: ../..
+      dockerfile: deploy/docker/core.Dockerfile
+      target: model
+    environment:
+      HUSHMARK_CORE_NER_BACKEND: onnx
+      HUSHMARK_CORE_LOG_LEVEL: info
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/readyz', timeout=2).read()",
+        ]
+      start_period: 90s
+
+  fake-upstream:
+    <<: *readonly-service
+    image: hushmark/gateway:0.1.0
+    entrypoint: ["node", "eval/fake-upstream.mjs"]
+    environment:
+      PORT: "9000"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:9000/healthz').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+
+  gateway:
+    <<: *readonly-service
+    image: hushmark/gateway:0.1.0
+    build:
+      context: ../..
+      dockerfile: deploy/docker/gateway.Dockerfile
+    depends_on:
+      core:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      vault-init:
+        condition: service_completed_successfully
+      fake-upstream:
+        condition: service_healthy
+    environment:
+      HUSHMARK_GATEWAY_HOST: 0.0.0.0
+      HUSHMARK_GATEWAY_PORT: "8080"
+      HUSHMARK_API_KEYS: hm_k1_evaluation_local_key
+      HUSHMARK_CORE_URL: http://core:8000
+      HUSHMARK_OPENAI_UPSTREAM: http://fake-upstream:9000/v1
+      HUSHMARK_ANTHROPIC_UPSTREAM: http://fake-upstream:9000/v1
+      HUSHMARK_POLICY_PATH: /opt/hushmark/node_modules/@hushmark/gateway/policy.yaml
+      HUSHMARK_DATABASE_URL: postgres://hushmark:hushmark-evaluation-only@postgres:5432/hushmark
+      HUSHMARK_LICENSE_FILE: /run/hushmark/license/license.json
+      HUSHMARK_LICENSE_PUBLIC_KEY_FILE: /run/hushmark/license/public.pem
+      HUSHMARK_KMS_KIND: vault
+      HUSHMARK_KMS_KEY_ID: hushmark
+      HUSHMARK_VAULT_ADDR: http://vault:8200
+      HUSHMARK_VAULT_TOKEN: hushmark-evaluation-token
+      HUSHMARK_ADMIN_EMAIL: admin@hushmark.local
+      HUSHMARK_ADMIN_PASSWORD: hushmark-evaluation-admin
+    volumes:
+      - ./eval:/run/hushmark/license:ro
+    ports:
+      - "127.0.0.1:8080:8080"
+
+  console:
+    <<: *readonly-service
+    image: hushmark/console:0.1.0
+    build:
+      context: ../..
+      dockerfile: deploy/docker/console.Dockerfile
+    depends_on:
+      gateway:
+        condition: service_healthy
+    environment:
+      HUSHMARK_GATEWAY_URL: http://gateway:8080
+    ports:
+      - "127.0.0.1:3000:3000"
+
+volumes:
+  postgres-data:

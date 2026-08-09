@@ -1,0 +1,92 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "hushmark.fullname" . }}-core
+  labels:
+    {{- include "hushmark.labels" . | nindent 4 }}
+    app.kubernetes.io/component: core
+spec:
+  replicas: {{ .Values.core.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "hushmark.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: core
+  template:
+    metadata:
+      labels:
+        {{- include "hushmark.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: core
+    spec:
+      automountServiceAccountToken: false
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: core
+          image: {{ include "hushmark.image" .Values.core.image | quote }}
+          imagePullPolicy: {{ .Values.core.image.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+            readOnlyRootFilesystem: true
+          env:
+            - name: HUSHMARK_CORE_HOST
+              value: 0.0.0.0
+            - name: HUSHMARK_CORE_PORT
+              value: {{ .Values.core.service.port | quote }}
+            - name: HUSHMARK_CORE_NER_BACKEND
+              value: {{ .Values.core.nerBackend | quote }}
+            - name: HUSHMARK_CORE_NER_THRESHOLD
+              value: {{ .Values.core.nerThreshold | quote }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.core.service.port }}
+          livenessProbe:
+            httpGet: { path: /healthz, port: http }
+            periodSeconds: 15
+          readinessProbe:
+            httpGet: { path: /readyz, port: http }
+            periodSeconds: 10
+            failureThreshold: 12
+          startupProbe:
+            httpGet: { path: /readyz, port: http }
+            periodSeconds: 10
+            failureThreshold: 30
+          resources:
+            {{- toYaml .Values.core.resources | nindent 12 }}
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+            {{- if not .Values.core.model.baked }}
+            - { name: models, mountPath: /models, readOnly: true }
+            {{- end }}
+      volumes:
+        - name: tmp
+          emptyDir: { sizeLimit: 64Mi }
+        {{- if not .Values.core.model.baked }}
+        - name: models
+          persistentVolumeClaim:
+            claimName: {{ required "core.model.existingClaim is required when baked=false" .Values.core.model.existingClaim }}
+        {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "hushmark.fullname" . }}-core
+  labels:
+    {{- include "hushmark.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "hushmark.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: core
+  ports:
+    - name: http
+      port: {{ .Values.core.service.port }}
+      targetPort: http

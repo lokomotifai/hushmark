@@ -1,0 +1,22 @@
+suite: gateway workload security
+templates:
+  - templates/gateway.yaml
+tests:
+  - it: runs gateway as non-root with a read-only filesystem
+    asserts:
+      - equal:
+          path: spec.template.spec.securityContext.runAsNonRoot
+          value: true
+        documentIndex: 0
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.readOnlyRootFilesystem
+          value: true
+        documentIndex: 0
+  - it: selects enterprise entrypoint only when enabled
+    set:
+      enterprise.enabled: true
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].args[0]
+          value: dist/cli.js
+        documentIndex: 0

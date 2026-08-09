@@ -1,0 +1,27 @@
+services:
+  core:
+    image: hushmark/core:0.1.0-dev
+    build:
+      target: slim
+    cpus: 4.0
+    mem_limit: 6g
+    volumes:
+      - ../../models:/models:ro
+    environment:
+      HUSHMARK_CORE_LOG_LEVEL: debug
+    ports:
+      - "127.0.0.1:8000:8000"
+
+  gateway:
+    cpus: 1.0
+    mem_limit: 1g
+    environment:
+      HUSHMARK_VAULT_TTL_SEC: "3600"
+
+  console:
+    environment:
+      NEXT_TELEMETRY_DISABLED: "1"
+
+  fake-upstream:
+    ports:
+      - "127.0.0.1:9000:9000"

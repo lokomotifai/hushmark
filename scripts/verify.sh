@@ -21,8 +21,8 @@ fi
 "$pnpm_cmd" depcruise
 "$pnpm_cmd" depcruise:fixture
 
-uv run ruff format --check bench core sdk-py tools examples/python-batch scripts/fetch-models.py
-uv run ruff check bench core sdk-py tools examples/python-batch scripts/fetch-models.py
+uv run ruff format --check bench core sdk-py tools examples/python-batch scripts/*.py
+uv run ruff check bench core sdk-py tools examples/python-batch scripts/*.py
 uv run mypy bench/src core/src sdk-py/src
 uv run pytest
 uv run lint-imports
@@ -30,6 +30,7 @@ uv run python tools/codegen/generate.py --check
 uv run python tools/codegen/claims_lint.py
 
 ./scripts/check-build-context.sh
+uv run python scripts/check-packaging.py
 
 private_key_marker='-----BEGIN '"PRIVATE KEY"'-----'
 if rg -n --fixed-strings --hidden \

@@ -5,6 +5,7 @@ import { GatewayError } from "./errors.js";
 
 export interface CorePort {
   mask(request: MaskRequest): Promise<MaskResponse>;
+  ready?(): Promise<boolean>;
   close?(): Promise<void>;
 }
 
@@ -46,6 +47,21 @@ export class CoreClient implements CorePort {
     } catch (error) {
       if (error instanceof GatewayError) throw error;
       throw new GatewayError("HM-5030", "detection engine unavailable");
+    }
+  }
+
+  async ready(): Promise<boolean> {
+    try {
+      const response = await this.#pool.request({
+        path: "/readyz",
+        method: "GET",
+        headersTimeout: this.timeoutMs,
+        bodyTimeout: this.timeoutMs,
+      });
+      await response.body.dump();
+      return response.statusCode === 200;
+    } catch {
+      return false;
     }
   }
 

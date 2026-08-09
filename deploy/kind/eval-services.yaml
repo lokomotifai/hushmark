@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: vault }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: vault } }
+  template:
+    metadata: { labels: { app: vault } }
+    spec:
+      containers:
+        - name: vault
+          image: hashicorp/vault:1.21@sha256:4e33b126a59c0c333b76fb4e894722462659a6bec7c48c9ee8cea56fccfd2569
+          args: ["server", "-dev"]
+          securityContext: { capabilities: { add: ["IPC_LOCK"] } }
+          env:
+            - { name: VAULT_DEV_ROOT_TOKEN_ID, value: hushmark-evaluation-token }
+            - { name: VAULT_DEV_LISTEN_ADDRESS, value: "0.0.0.0:8200" }
+          ports: [{ name: http, containerPort: 8200 }]
+          readinessProbe: { httpGet: { path: /v1/sys/health, port: http }, periodSeconds: 3 }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: vault }
+spec:
+  selector: { app: vault }
+  ports: [{ name: http, port: 8200, targetPort: http }]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: fake-upstream }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: fake-upstream } }
+  template:
+    metadata: { labels: { app: fake-upstream } }
+    spec:
+      automountServiceAccountToken: false
+      securityContext: { runAsNonRoot: true, runAsUser: 10001, runAsGroup: 10001 }
+      containers:
+        - name: fake-upstream
+          image: hushmark/gateway:0.1.0
+          imagePullPolicy: Never
+          command: ["node", "eval/fake-upstream.mjs"]
+          env: [{ name: PORT, value: "9000" }]
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+            readOnlyRootFilesystem: true
+          ports: [{ name: http, containerPort: 9000 }]
+          readinessProbe: { httpGet: { path: /healthz, port: http }, periodSeconds: 3 }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: fake-upstream }
+spec:
+  selector: { app: fake-upstream }
+  ports: [{ name: http, port: 9000, targetPort: http }]

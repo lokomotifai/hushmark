@@ -19,6 +19,16 @@ describe("provider round-trip", () => {
 
   afterEach(async () => app.close());
 
+  it("serves liveness and core-backed readiness without an API key", async () => {
+    const health = await app.inject({ method: "GET", url: "/healthz" });
+    const readiness = await app.inject({ method: "GET", url: "/readyz" });
+
+    expect(health.statusCode).toBe(200);
+    expect(health.json()).toEqual({ status: "ok" });
+    expect(readiness.statusCode).toBe(200);
+    expect(readiness.json()).toEqual({ status: "ready" });
+  });
+
   it.each([
     ["openai", false],
     ["openai", true],

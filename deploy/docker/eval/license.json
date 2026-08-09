@@ -1,0 +1,12 @@
+{
+  "v": 1,
+  "licensee": "Hushmark local evaluation",
+  "tier": "regulated",
+  "issued_at": "2026-08-09T00:00:00.000Z",
+  "expires_at": "2030-08-09T00:00:00.000Z",
+  "grace_days": 30,
+  "entitlements": {
+    "features": ["sso", "kms_vault", "audit_chain", "tedbir_report"]
+  },
+  "sig": "fhD3dAn0JTT2zRFOwX+3kdDsGa1GSPHlogCToaH0cXIvccr4veq280EM6Zsd+/rCiq4Ic1rkJEdQGvaogaenAw=="
+}
