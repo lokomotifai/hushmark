@@ -24,6 +24,11 @@ class AnalyzeRequest(StrictModel):
     session: str | None = None
 
 
+class MaskRequest(AnalyzeRequest):
+    include_values: bool = False
+    collision_mode: Literal["reject", "prefix"] = "reject"
+
+
 class EntitySpan(StrictModel):
     type: str
     start: int = Field(ge=0)
@@ -51,6 +56,36 @@ class AnalyzeResponse(StrictModel):
     taxonomy_version: str
 
 
+class MappingRecord(StrictModel):
+    placeholder: str
+    type: str
+    start: int = Field(ge=0)
+    end: int = Field(gt=0)
+    value: str | None = None
+    confidence: float = Field(ge=0.0, le=1.0)
+    layer: Literal["deterministic", "ner"]
+
+    @model_validator(mode="after")
+    def validate_closed_mapping_type(self) -> MappingRecord:
+        if self.type not in ENTITY_TYPES:
+            raise ValueError("mapping type is outside the closed taxonomy")
+        if self.end <= self.start:
+            raise ValueError("mapping end must be greater than start")
+        return self
+
+
+class MaskItem(StrictModel):
+    id: str
+    masked_text: str
+    mappings: list[MappingRecord]
+
+
+class MaskResponse(StrictModel):
+    items: list[MaskItem]
+    model_id: str
+    taxonomy_version: str
+
+
 class MetadataResponse(StrictModel):
     version: str
     model_id: str
@@ -60,4 +95,4 @@ class MetadataResponse(StrictModel):
 
 
 class HealthResponse(StrictModel):
-    status: Literal["ok", "ready"]
+    status: Literal["ok", "ready", "loading"]

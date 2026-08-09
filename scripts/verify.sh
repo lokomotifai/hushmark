@@ -4,6 +4,9 @@ set -euo pipefail
 repo_dir=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 cd "$repo_dir"
 
+export HF_HUB_OFFLINE=1
+export TRANSFORMERS_OFFLINE=1
+
 pnpm_cmd="$repo_dir/node_modules/.bin/pnpm"
 if [[ ! -x "$pnpm_cmd" ]]; then
   echo "Local pnpm is missing; run ./scripts/bootstrap.sh first." >&2
@@ -18,8 +21,8 @@ fi
 "$pnpm_cmd" depcruise
 "$pnpm_cmd" depcruise:fixture
 
-uv run ruff format --check core tools/codegen
-uv run ruff check core tools/codegen
+uv run ruff format --check core tools scripts/fetch-models.py
+uv run ruff check core tools scripts/fetch-models.py
 uv run mypy core/src
 uv run pytest
 uv run lint-imports
