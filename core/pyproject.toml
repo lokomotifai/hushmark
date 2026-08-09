@@ -6,6 +6,8 @@ requires-python = ">=3.12,<3.13"
 license = "Apache-2.0"
 dependencies = [
   "fastapi>=0.116.0",
+  "httpx>=0.28.0",
+  "presidio-analyzer>=2.2.360",
   "pydantic>=2.11.0",
   "pydantic-settings>=2.10.0",
   "structlog>=25.4.0",
