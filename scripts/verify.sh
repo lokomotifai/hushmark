@@ -28,6 +28,7 @@ uv run pytest
 uv run lint-imports
 uv run python tools/codegen/generate.py --check
 uv run python tools/codegen/claims_lint.py
+uv run python scripts/generate-docs.py --check
 
 ./scripts/check-build-context.sh
 uv run python scripts/check-packaging.py

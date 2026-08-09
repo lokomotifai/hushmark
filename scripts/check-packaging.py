@@ -12,6 +12,34 @@ import yaml
 ROOT = Path(__file__).resolve().parents[1]
 DOCKER_DIR = ROOT / "deploy" / "docker"
 CHART_DIR = ROOT / "deploy" / "helm" / "hushmark"
+RELEASE_VERSION = "0.1.0"
+
+
+def check_versions() -> None:
+    package_files = [
+        ROOT / "package.json",
+        ROOT / "apps/console/package.json",
+        ROOT / "examples/nextjs-chat/package.json",
+        ROOT / "packages/gateway/package.json",
+        ROOT / "packages/gateway-enterprise/package.json",
+        ROOT / "packages/sdk-ts/package.json",
+        ROOT / "packages/shared/package.json",
+        ROOT / "tools/license-issuer/package.json",
+        ROOT / "tools/release/package.json",
+    ]
+    for path in package_files:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        assert data.get("version") == RELEASE_VERSION, f"version drift: {path}"
+    python_projects = [
+        ROOT / "pyproject.toml",
+        ROOT / "bench/pyproject.toml",
+        ROOT / "core/pyproject.toml",
+        ROOT / "sdk-py/pyproject.toml",
+        ROOT / "tools/codegen/pyproject.toml",
+    ]
+    for path in python_projects:
+        content = path.read_text(encoding="utf-8")
+        assert f'version = "{RELEASE_VERSION}"' in content, f"version drift: {path}"
 
 
 def check_dockerfiles() -> None:
@@ -23,6 +51,9 @@ def check_dockerfiles() -> None:
     core = (DOCKER_DIR / "core.Dockerfile").read_text(encoding="utf-8")
     assert "uv sync --frozen" in core
     assert "FROM runtime AS model" in core and "FROM runtime AS slim" in core
+    airgap_core = (DOCKER_DIR / "core-airgap.Dockerfile").read_text(encoding="utf-8")
+    assert "model_quantized.onnx" in airgap_core
+    assert "pytorch_model.bin" not in airgap_core and "model.onnx" not in airgap_core
     console = (DOCKER_DIR / "console.Dockerfile").read_text(encoding="utf-8")
     assert ".next/standalone" in console
 
@@ -58,6 +89,7 @@ def check_chart() -> None:
 
 
 def main() -> None:
+    check_versions()
     check_dockerfiles()
     check_compose()
     check_chart()

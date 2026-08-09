@@ -1,0 +1,20 @@
+{
+  "name": "release",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "SEE LICENSE IN LICENSE",
+  "engines": {
+    "node": "22.x"
+  },
+  "scripts": {
+    "build": "tsc --noEmit",
+    "extract-public": "node --experimental-strip-types extract-public.ts",
+    "lint": "eslint extract-public.ts test",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "vitest": "^4.0.18"
+  }
+}

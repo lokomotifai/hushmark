@@ -23,7 +23,9 @@ COPY scripts/fetch-models.py scripts/fetch-models.py
 COPY tools/export-onnx.py tools/export-onnx.py
 RUN uv run python scripts/fetch-models.py \
     && uv run python tools/export-onnx.py \
-    && rm -f models/gliner_multi_pii-v1/pytorch_model.bin
+    && rm -f \
+      models/gliner_multi_pii-v1/model.onnx \
+      models/gliner_multi_pii-v1/pytorch_model.bin
 
 FROM ${PYTHON_IMAGE} AS runtime
 ARG HUSHMARK_UID=10001

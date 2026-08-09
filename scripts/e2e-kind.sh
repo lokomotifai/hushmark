@@ -7,15 +7,61 @@ cd "$repo_dir"
 cluster_name="hushmark-e2e-${RANDOM}"
 namespace=hushmark
 port_forward_pid=""
+airgap_archive=""
+airgap_extract_dir=""
 cleanup() {
   if [[ -n "$port_forward_pid" ]]; then kill "$port_forward_pid" 2>/dev/null || true; fi
+  if [[ -n "$airgap_extract_dir" ]]; then rm -rf "$airgap_extract_dir"; fi
   kind delete cluster --name "$cluster_name" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
 
+if (($# > 0)); then
+  if [[ $# -ne 2 || $1 != "--airgap" ]]; then
+    echo "usage: $0 [--airgap PATH]" >&2
+    exit 2
+  fi
+  airgap_archive=$(CDPATH= cd -- "$(dirname -- "$2")" && pwd)/$(basename -- "$2")
+  [[ -f "$airgap_archive" ]] || { echo "air-gap archive not found: $airgap_archive" >&2; exit 1; }
+fi
+
 for tool in docker kind helm kubectl curl; do
   command -v "$tool" >/dev/null || { echo "$tool is required" >&2; exit 1; }
 done
+
+if [[ -n "$airgap_archive" ]]; then
+  airgap_extract_dir=$(mktemp -d)
+  tar -xf "$airgap_archive" -C "$airgap_extract_dir"
+  install_script=$(find "$airgap_extract_dir" -mindepth 2 -maxdepth 2 -name install.sh -print -quit)
+  [[ -n "$install_script" ]] || { echo "air-gap installer is missing" >&2; exit 1; }
+
+  kind create cluster --name "$cluster_name" --wait 120s
+  "$install_script" --kind-cluster "$cluster_name" --evaluation
+
+  pull_events=$(kubectl -n "$namespace" get events -o jsonpath='{range .items[?(@.reason=="Pulling")]}{.message}{"\n"}{end}')
+  [[ -z "$pull_events" ]] || { echo "registry pull observed in offline cluster: $pull_events" >&2; exit 1; }
+  policies=$(kubectl -n "$namespace" get pods -o jsonpath='{range .items[*].spec.containers[*]}{.imagePullPolicy}{"\n"}{end}')
+  if grep -Fvxq Never <<<"$policies"; then
+    echo "offline workload without imagePullPolicy Never" >&2
+    exit 1
+  fi
+
+  kubectl -n "$namespace" port-forward service/hushmark-gateway 18080:8080 >"/tmp/${cluster_name}-port-forward.log" 2>&1 &
+  port_forward_pid=$!
+  for _ in {1..60}; do
+    curl --fail --silent http://127.0.0.1:18080/healthz >/dev/null && break
+    sleep 1
+  done
+  response=$(curl --fail --silent --show-error \
+    -H 'authorization: Bearer hm_k1_evaluation_local_key' \
+    -H 'content-type: application/json' \
+    --data '{"model":"hushmark-eval","messages":[{"role":"user","content":"TCKN 10000000146 için kaydı bul"}]}' \
+    http://127.0.0.1:18080/v1/chat/completions)
+  grep -Fq '10000000146' <<<"$response"
+  kubectl -n "$namespace" get service hushmark-core -o jsonpath='{.spec.type}' | grep -Fxq ClusterIP
+  echo "Air-gap kind demo restored the TCKN using only preloaded images; no registry pull was observed."
+  exit 0
+fi
 
 docker build --target slim -f deploy/docker/core.Dockerfile -t hushmark/core:0.1.0 .
 docker build -f deploy/docker/gateway.Dockerfile -t hushmark/gateway:0.1.0 .
