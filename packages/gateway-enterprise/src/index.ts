@@ -19,6 +19,7 @@ export * from "./license/schema.js";
 export * from "./license/state.js";
 export * from "./license/verify.js";
 export * from "./policy/db.js";
+export * from "./reports/tedbir.js";
 export * from "./server.js";
 export * from "./vault/kmsEnvelope.js";
 export * from "./vault/repository.js";

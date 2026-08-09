@@ -22,6 +22,7 @@
     "audit-verify": "node dist/audit-verify.js"
   },
   "dependencies": {
+    "@react-pdf/renderer": "4.5.1",
     "@azure/core-auth": "^1.9.0",
     "@azure/identity": "4.13.1",
     "@azure/keyvault-keys": "4.10.2",
@@ -30,16 +31,20 @@
     "@hushmark/shared": "workspace:*",
     "argon2": "0.45.1",
     "canonicalize": "3.0.0",
+    "dejavu-fonts-ttf": "2.37.3",
     "drizzle-orm": "0.45.2",
     "fastify": "^5.8.0",
     "pg": "^8.16.3",
+    "react": "^19.2.0",
     "zod": "^4.3.5"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.4",
     "@types/pg": "^8.15.5",
+    "@types/react": "^19.2.0",
     "drizzle-kit": "^0.31.8",
     "tsup": "^8.5.1",
-    "vitest": "^4.0.18"
+    "vitest": "^4.0.18",
+    "pdf-parse": "2.4.5"
   }
 }

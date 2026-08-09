@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import type {
   FastifyInstance,
   FastifyReply,
@@ -10,9 +12,10 @@ import { z } from "zod";
 import { sha256 } from "../audit/canonical.js";
 import type { AuditStore } from "../audit/store.js";
 import type { AuditWriter } from "../audit/writer.js";
-import { auditNdjson } from "../audit/verify.js";
+import { auditNdjson, verifyAuditChain } from "../audit/verify.js";
 import type { LicenseGuard } from "../license/enforce.js";
 import { EnterprisePolicySchema, type CachedPolicyEvaluator } from "../policy/db.js";
+import { buildTedbirReportData, renderTedbirPdf } from "../reports/tedbir.js";
 import type { KmsEnvelopeVault } from "../vault/kmsEnvelope.js";
 import {
   issueApiKey,
@@ -36,6 +39,25 @@ const ProviderSchema = z
   .strict();
 const VaultResolveSchema = z
   .object({ session_id: z.string().min(1), placeholder: z.string().min(1) })
+  .strict();
+const AuditPageSchema = z
+  .object({
+    page: z.coerce.number().int().positive().default(1),
+    limit: z.coerce.number().int().min(1).max(100).default(25),
+  })
+  .strict();
+const AuditRangeSchema = z
+  .object({
+    from: z.coerce.number().int().positive().optional(),
+    to: z.union([z.coerce.number().int().positive(), z.literal("latest")]).optional(),
+  })
+  .strict();
+const ReportQuerySchema = z
+  .object({
+    from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/u),
+    to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/u),
+    format: z.literal("pdf").default("pdf"),
+  })
   .strict();
 
 export interface AdminRouteDependencies {
@@ -195,14 +217,37 @@ export function registerAdminRoutes(
 
   app.get("/admin/audit/events", { preHandler: authenticate }, async (request) => {
     requireRole(principalFor(request).role, ["admin", "auditor"]);
-    return { events: await dependencies.auditStore.list() };
+    const query = AuditPageSchema.parse(request.query);
+    const events = [...(await dependencies.auditStore.list())].reverse();
+    const start = (query.page - 1) * query.limit;
+    return {
+      events: events.slice(start, start + query.limit),
+      page: query.page,
+      limit: query.limit,
+      total: events.length,
+    };
   });
   app.get("/admin/audit/export", { preHandler: authenticate }, async (request, reply) => {
     const principal = principalFor(request);
     requireRole(principal.role, ["admin", "auditor"]);
+    const range = AuditRangeSchema.parse(request.query);
     await auditAdminChange(dependencies.audit, "EXPORT_RUN", principal, "audit-export");
+    const records = (await dependencies.auditStore.list()).filter(
+      (record) =>
+        record.seq >= (range.from ?? 1) &&
+        (range.to === undefined || range.to === "latest" || record.seq <= range.to),
+    );
     reply.header("content-type", "application/x-ndjson; charset=utf-8");
-    return auditNdjson(await dependencies.auditStore.list());
+    return auditNdjson(records);
+  });
+  app.get("/admin/audit/verify", { preHandler: authenticate }, async (request) => {
+    requireRole(principalFor(request).role, ["admin", "auditor"]);
+    const range = AuditRangeSchema.parse(request.query);
+    return verifyAuditChain(
+      await dependencies.auditStore.list(),
+      range.from ?? 1,
+      range.to ?? "latest",
+    );
   });
 
   app.post("/admin/vault/resolve", { preHandler: authenticate }, async (request) => {
@@ -243,6 +288,29 @@ export function registerAdminRoutes(
     }
     return { masked, blocked, entity_counts: entityCounts };
   });
+
+  app.get("/admin/reports/tedbir", { preHandler: authenticate }, async (request, reply) => {
+    const principal = principalFor(request);
+    requireRole(principal.role, ["admin", "auditor"]);
+    if (!dependencies.license.has("tedbir_report")) {
+      throw new GatewayError("HM-4030", "license does not include the report feature");
+    }
+    const query = ReportQuerySchema.parse(request.query);
+    await auditAdminChange(dependencies.audit, "EXPORT_RUN", principal, "tedbir-report");
+    const data = buildTedbirReportData(
+      await dependencies.auditStore.list(),
+      query.from,
+      query.to,
+      now().toISOString(),
+    );
+    const pdf = await renderTedbirPdf(data);
+    reply.header("content-type", "application/pdf");
+    reply.header(
+      "content-disposition",
+      `attachment; filename="hushmark-tedbir-${query.from}-${query.to}.pdf"`,
+    );
+    return reply.send(pdf);
+  });
 }
 
 async function auditAdminChange(
@@ -273,4 +341,3 @@ function idParam(request: FastifyRequest): string {
   const parsed = z.object({ id: z.uuid() }).parse(request.params);
   return parsed.id;
 }
-import { randomUUID } from "node:crypto";

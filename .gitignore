@@ -20,5 +20,7 @@ models/
 *.tsbuildinfo
 playwright-report/
 test-results/
+tmp/pdfs/
+output/pdf/*.pdf
 perf/reports/*.json
 bench/train/outputs/
