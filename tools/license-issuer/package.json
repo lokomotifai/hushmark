@@ -1,0 +1,27 @@
+{
+  "name": "@hushmark/license-issuer",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "SEE LICENSE IN LICENSE",
+  "engines": {
+    "node": "22.x"
+  },
+  "bin": {
+    "hushmark-license": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsup src/cli.ts --format esm --dts --clean",
+    "lint": "eslint src test",
+    "typecheck": "tsc --noEmit",
+    "test": "pnpm build && vitest run"
+  },
+  "dependencies": {
+    "@hushmark/gateway-enterprise": "workspace:*"
+  },
+  "devDependencies": {
+    "execa": "^9.6.0",
+    "tsup": "^8.5.1",
+    "vitest": "^4.0.18"
+  }
+}

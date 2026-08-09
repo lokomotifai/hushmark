@@ -9,7 +9,7 @@ import type { StaticPolicy } from "../config.js";
 import type { CorePort } from "../coreClient.js";
 import { GatewayError } from "../errors.js";
 import { StaticPolicyEvaluator } from "../policy/static.js";
-import type { MemoryVault } from "../vault/memory.js";
+import type { PlaceholderVault } from "../vault/memory.js";
 
 export interface TextSegment {
   id: string;
@@ -29,9 +29,9 @@ export class MaskPipeline {
   constructor(
     private readonly core: CorePort,
     policy: StaticPolicy,
-    private readonly vault: MemoryVault,
+    private readonly vault: PlaceholderVault,
     private readonly ttlSec: number,
-    private readonly onEvent: (event: MaskEvent) => void = () => undefined,
+    private readonly onEvent: (event: MaskEvent) => Promise<void> | void = () => undefined,
   ) {
     this.#policy = new StaticPolicyEvaluator(policy);
   }
@@ -91,7 +91,11 @@ export class MaskPipeline {
     if (blocked.size > 0) {
       throw new GatewayError("HM-4201", "blocked entity types", [...blocked].sort());
     }
-    this.onEvent({ event: "MASK_APPLIED", session_id: session, entities: [...counts.values()] });
+    await this.onEvent({
+      event: "MASK_APPLIED",
+      session_id: session,
+      entities: [...counts.values()],
+    });
     return response;
   }
 }

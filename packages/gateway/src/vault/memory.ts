@@ -12,6 +12,10 @@ export interface VaultStore {
   sweep(now: Date): Promise<number>;
 }
 
+export interface PlaceholderVault extends VaultStore {
+  intern(session: string, requested: string, record: VaultRecord): Promise<string>;
+}
+
 interface StoredRecord extends VaultRecord {
   expiresAt: number;
   reverseKey: string;
@@ -23,7 +27,7 @@ export type VaultEvent =
 
 const PLACEHOLDER_PARTS = /^\[([A-Z]{2,12})_[1-9][0-9]{0,4}\](#[0-9a-f]{4})?$/u;
 
-export class MemoryVault implements VaultStore {
+export class MemoryVault implements PlaceholderVault {
   readonly #entries = new Map<string, StoredRecord>();
   readonly #reverse = new Map<string, string>();
   readonly #counters = new Map<string, number>();

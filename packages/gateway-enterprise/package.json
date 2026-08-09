@@ -1,0 +1,45 @@
+{
+  "name": "@hushmark/gateway-enterprise",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "SEE LICENSE IN LICENSE",
+  "engines": {
+    "node": "22.x"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsup src/index.ts src/cli.ts src/audit-verify.ts --format esm --dts --clean",
+    "lint": "eslint src test drizzle.config.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --exclude test/net-required/**",
+    "test:net": "vitest run test/net-required",
+    "audit-verify": "node dist/audit-verify.js"
+  },
+  "dependencies": {
+    "@azure/core-auth": "^1.9.0",
+    "@azure/identity": "4.13.1",
+    "@azure/keyvault-keys": "4.10.2",
+    "@google-cloud/kms": "5.7.0",
+    "@hushmark/gateway": "workspace:*",
+    "@hushmark/shared": "workspace:*",
+    "argon2": "0.45.1",
+    "canonicalize": "3.0.0",
+    "drizzle-orm": "0.45.2",
+    "fastify": "^5.8.0",
+    "pg": "^8.16.3",
+    "zod": "^4.3.5"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.5.4",
+    "@types/pg": "^8.15.5",
+    "drizzle-kit": "^0.31.8",
+    "tsup": "^8.5.1",
+    "vitest": "^4.0.18"
+  }
+}

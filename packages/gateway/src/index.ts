@@ -2,6 +2,7 @@ export * from "./config.js";
 export * from "./coreClient.js";
 export * from "./errors.js";
 export * from "./mask/pipeline.js";
+export * from "./policy/static.js";
 export * from "./providers/anthropic.js";
 export * from "./providers/openai.js";
 export * from "./server.js";

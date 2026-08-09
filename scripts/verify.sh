@@ -31,6 +31,17 @@ uv run python tools/codegen/claims_lint.py
 
 ./scripts/check-build-context.sh
 
+private_key_marker='-----BEGIN '"PRIVATE KEY"'-----'
+if rg -n --fixed-strings --hidden \
+  --glob '!.git/**' --glob '!node_modules/**' --glob '!.venv/**' --glob '!dist/**' \
+  --glob '!research/**' --glob '!briefs/**' --glob '!hushmark/**' \
+  --glob '!bench/data/**' --glob '!bench/src/hushmark_bench/dataset.py' \
+  --glob '!core/tests/test_validators.py' \
+  -- "$private_key_marker" .; then
+  echo "Committed private key material found." >&2
+  exit 1
+fi
+
 if rg -n --hidden --glob '!research/**' --glob '!briefs/**' --glob '!hushmark/**' \
   --glob '!.git/**' \
   --glob '!node_modules/**' --glob '!.venv/**' --glob '!dist/**' --glob '!.turbo/**' \

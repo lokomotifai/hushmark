@@ -13,21 +13,22 @@ import type { GatewayConfig, StaticPolicy } from "./config.js";
 import type { CorePort } from "./coreClient.js";
 import { CoreClient } from "./coreClient.js";
 import { GatewayError } from "./errors.js";
-import { MaskPipeline } from "./mask/pipeline.js";
+import { MaskPipeline, type MaskEvent } from "./mask/pipeline.js";
 import { AnthropicAdapter } from "./providers/anthropic.js";
 import { OpenAiAdapter } from "./providers/openai.js";
 import type { ProviderAdapter } from "./providers/types.js";
 import { transformSse } from "./streaming/sse.js";
 import { unmaskText } from "./streaming/unmasker.js";
 import { HttpUpstream, type UpstreamPort } from "./upstream.js";
-import { MemoryVault } from "./vault/memory.js";
+import { MemoryVault, type PlaceholderVault, type VaultStore } from "./vault/memory.js";
 
 export interface ServerDependencies {
   config: GatewayConfig;
   policy: StaticPolicy;
   core?: CorePort;
   upstream?: UpstreamPort;
-  vault?: MemoryVault;
+  vault?: PlaceholderVault;
+  onMaskEvent?: (event: MaskEvent) => Promise<void> | void;
   logger?: boolean;
 }
 
@@ -50,7 +51,7 @@ export function buildServer(dependencies: ServerDependencies): FastifyInstance {
     dependencies.policy,
     vault,
     config.HUSHMARK_VAULT_TTL_SEC,
-    (event) => app.log.info(event),
+    dependencies.onMaskEvent ?? ((event) => app.log.info(event)),
   );
 
   app.setErrorHandler((error, _request, reply) => {
@@ -72,7 +73,7 @@ export function buildServer(dependencies: ServerDependencies): FastifyInstance {
   });
 
   app.addHook("onRequest", (request, _reply, done) => {
-    if (request.url === "/healthz") {
+    if (request.url === "/healthz" || request.url.startsWith("/admin/")) {
       done();
       return;
     }
@@ -124,7 +125,7 @@ async function handleProvider(
   adapter: ProviderAdapter,
   pipeline: MaskPipeline,
   upstream: UpstreamPort,
-  vault: MemoryVault,
+  vault: VaultStore,
   policy: StaticPolicy,
 ): Promise<unknown> {
   const parsed = adapter.parseRequest(request.body);
