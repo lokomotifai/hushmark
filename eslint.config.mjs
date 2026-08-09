@@ -37,4 +37,14 @@ export default tseslint.config(
       globals: { ...globals.node, ...globals.browser },
     },
   },
+  {
+    files: ["packages/gateway/test/**/*.ts"],
+    rules: {
+      "@typescript-eslint/no-misused-spread": "off",
+      "@typescript-eslint/no-unsafe-assignment": "off",
+      "@typescript-eslint/no-unsafe-member-access": "off",
+      "@typescript-eslint/no-unsafe-return": "off",
+      "@typescript-eslint/require-await": "off",
+    },
+  },
 );
