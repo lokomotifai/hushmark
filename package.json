@@ -1,0 +1,31 @@
+{
+  "name": "hushmark-monorepo",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@9.15.9",
+  "engines": {
+    "node": "22.x",
+    "pnpm": ">=9 <12"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "format:check": "prettier --check .",
+    "depcruise": "depcruise --config .dependency-cruiser.cjs packages",
+    "depcruise:fixture": "node scripts/check-dependency-fixture.mjs"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.1",
+    "@types/node": "^22.18.0",
+    "dependency-cruiser": "^17.3.2",
+    "eslint": "^9.39.1",
+    "globals": "^16.5.0",
+    "pnpm": "9.15.9",
+    "prettier": "^3.7.4",
+    "turbo": "^2.7.3",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.51.0"
+  }
+}

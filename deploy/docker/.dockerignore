@@ -1,0 +1,16 @@
+.git
+.github
+.DS_Store
+node_modules
+.venv
+dist
+models
+research
+briefs
+hushmark
+PLAN.md
+PLAN-BRIEF.md
+EXECUTABLE-PLAN-PROMPT.md
+**/__pycache__
+**/.pytest_cache
+**/.turbo

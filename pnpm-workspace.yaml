@@ -1,0 +1,11 @@
+packages:
+  - "packages/*"
+  - "apps/*"
+  - "examples/*"
+  - "tools/license-issuer"
+  - "tools/release"
+
+onlyBuiltDependencies:
+  - argon2
+  - esbuild
+  - sharp

@@ -1,0 +1,12 @@
+research/
+.import_linter_cache/
+briefs/
+hushmark/
+PLAN.md
+PLAN-BRIEF.md
+EXECUTABLE-PLAN-PROMPT.md
+models/
+dist/
+pnpm-lock.yaml
+uv.lock
+packages/shared/src/taxonomy.gen.ts

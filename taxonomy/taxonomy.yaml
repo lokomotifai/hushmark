@@ -1,0 +1,170 @@
+taxonomy_version: 1
+entities:
+  - type: TR_TCKN
+    layer: deterministic
+    kvkk_class: general
+    z_class: Z3
+    default_action: mask
+    tr_label: TCKN
+    description: Turkish Republic identity number with checksum validation.
+  - type: TR_VKN
+    layer: deterministic
+    kvkk_class: general
+    z_class: Z3
+    default_action: mask
+    tr_label: VKN
+    description: Turkish tax identification number with checksum validation.
+  - type: TR_IBAN
+    layer: deterministic
+    kvkk_class: general
+    z_class: Z3
+    default_action: mask
+    tr_label: IBAN
+    description: Turkish IBAN validated with ISO 7064 mod-97.
+  - type: IBAN_OTHER
+    layer: deterministic
+    kvkk_class: general
+    z_class: Z3
+    default_action: mask
+    tr_label: IBAN
+    description: Non-Turkish IBAN validated with ISO 7064 mod-97.
+  - type: CREDIT_CARD
+    layer: deterministic
+    kvkk_class: general
+    z_class: Z5
+    default_action: block
+    tr_label: KART
+    description: Payment card number validated with the Luhn checksum.
+  - type: TR_PHONE
+    layer: deterministic
+    kvkk_class: general
+    z_class: Z2
+    default_action: mask
+    tr_label: TEL
+    description: Turkish mobile or landline phone number.
+  - type: TR_PLATE
+    layer: deterministic
+    kvkk_class: general
+    z_class: Z2
+    default_action: mask
+    tr_label: PLAKA
+    description: Turkish vehicle registration plate.
+  - type: TR_SGK
+    layer: deterministic
+    kvkk_class: general
+    z_class: Z3
+    default_action: mask
+    tr_label: SGK
+    description: Turkish social security registration number.
+  - type: EMAIL
+    layer: deterministic
+    kvkk_class: general
+    z_class: Z2
+    default_action: mask
+    tr_label: EPOSTA
+    description: Email address using a pragmatic internet-mail subset.
+  - type: SECRET_API_KEY
+    layer: deterministic
+    kvkk_class: secret
+    z_class: Z5
+    default_action: block
+    tr_label: SIR
+    description: Provider API key or access token.
+  - type: SECRET_JWT
+    layer: deterministic
+    kvkk_class: secret
+    z_class: Z5
+    default_action: block
+    tr_label: SIR
+    description: JSON Web Token with three base64url segments.
+  - type: SECRET_PRIVATE_KEY
+    layer: deterministic
+    kvkk_class: secret
+    z_class: Z5
+    default_action: block
+    tr_label: SIR
+    description: PEM-encoded private key block.
+  - type: PERSON
+    layer: ner
+    kvkk_class: general
+    z_class: Z2
+    default_action: mask
+    tr_label: KISI
+    description: Person name.
+  - type: ADDRESS
+    layer: ner
+    kvkk_class: general
+    z_class: Z2
+    default_action: mask
+    tr_label: ADRES
+    description: Street, neighborhood, or full postal address.
+  - type: ORG
+    layer: ner
+    kvkk_class: general
+    z_class: Z1
+    default_action: allow
+    tr_label: KURUM
+    description: Organization name.
+  - type: DOB
+    layer: ner
+    kvkk_class: general
+    z_class: Z2
+    default_action: mask
+    tr_label: DOGUM
+    description: Contextual date of birth.
+  - type: HEALTH
+    layer: ner
+    kvkk_class: special
+    z_class: Z5
+    default_action: block
+    tr_label: SAGLIK
+    description: Diagnosis, medication, or health condition.
+  - type: RELIGION
+    layer: ner
+    kvkk_class: special
+    z_class: Z5
+    default_action: block
+    tr_label: INANC
+    description: Religious or philosophical belief.
+  - type: ETHNICITY
+    layer: ner
+    kvkk_class: special
+    z_class: Z5
+    default_action: block
+    tr_label: KOKEN
+    description: Ethnic origin.
+  - type: POLITICAL
+    layer: ner
+    kvkk_class: special
+    z_class: Z5
+    default_action: block
+    tr_label: GORUS
+    description: Political opinion.
+  - type: SEXUAL_LIFE
+    layer: ner
+    kvkk_class: special
+    z_class: Z5
+    default_action: block
+    tr_label: MAHREM
+    description: Sexual-life information.
+  - type: CRIMINAL
+    layer: ner
+    kvkk_class: special
+    z_class: Z5
+    default_action: block
+    tr_label: SABIKA
+    description: Criminal conviction or security measure.
+  - type: BIOMETRIC_REF
+    layer: ner
+    kvkk_class: special
+    z_class: Z5
+    default_action: block
+    tr_label: BIYOMETRI
+    description: Textual reference to biometric data.
+  - type: UNION
+    layer: ner
+    kvkk_class: special
+    z_class: Z5
+    default_action: block
+    tr_label: UYELIK
+    description: Association or union membership.

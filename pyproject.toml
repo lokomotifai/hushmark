@@ -1,0 +1,58 @@
+[project]
+name = "hushmark-workspace"
+version = "0.1.0"
+requires-python = ">=3.12,<3.13"
+
+[tool.uv.workspace]
+members = ["core", "tools/codegen"]
+
+[dependency-groups]
+dev = [
+  "hypothesis>=6.138.0",
+  "import-linter>=2.5",
+  "mypy>=1.17.0",
+  "pytest>=8.4.0",
+  "pytest-asyncio>=1.1.0",
+  "pytest-benchmark>=5.1.0",
+  "ruff>=0.12.0",
+]
+
+[tool.pytest.ini_options]
+addopts = "-ra --strict-config --strict-markers"
+testpaths = ["core/tests", "tools/codegen/tests"]
+markers = [
+  "net_required: requires external network access",
+  "integration: requires local services or containers",
+]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+extend-exclude = [
+  "research",
+  "briefs",
+  "hushmark",
+  "core/src/hushmark_core/taxonomy_gen.py",
+]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+packages = ["hushmark_core"]
+mypy_path = ["core/src"]
+
+[tool.importlinter]
+root_packages = ["hushmark_core"]
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+name = "Core is independent from higher-level products"
+type = "forbidden"
+source_modules = ["hushmark_core"]
+forbidden_modules = ["hushmark_bench", "hushmark_sdk"]
