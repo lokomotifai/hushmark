@@ -1,0 +1,483 @@
+{
+  "backend": "onnx",
+  "dataset": {
+    "examples": 2016,
+    "name": "hushmark-bench-v0.jsonl",
+    "sha256": "6170b620faa349dbcbf2f2a973d5de20e35c6594e5626a2a589d20df5f67d642"
+  },
+  "duration_seconds": 56.427450999999564,
+  "engine": "core",
+  "model_id": "gliner_multi_pii-v1",
+  "model_sha256": "3003753fba99e40645cf088c7367a2c6211fc174897dc64f1f9c147c29d18d2d",
+  "partial": {
+    "macro": {
+      "f1": 0.5628685053705983,
+      "precision": 0.7878993691493692,
+      "recall": 0.5428096064814815
+    },
+    "micro": {
+      "f1": 0.7185283154983768,
+      "false_negative": 2244,
+      "false_positive": 97,
+      "precision": 0.9685575364667747,
+      "recall": 0.5711009174311926,
+      "support": 5232,
+      "true_positive": 2988
+    },
+    "mode": "partial",
+    "per_type": {
+      "ADDRESS": {
+        "f1": 0.034013605442176874,
+        "false_negative": 283,
+        "false_positive": 1,
+        "precision": 0.8333333333333334,
+        "recall": 0.017361111111111112,
+        "support": 288,
+        "true_positive": 5
+      },
+      "BIOMETRIC_REF": {
+        "f1": 0.0,
+        "false_negative": 96,
+        "false_positive": 0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "support": 96,
+        "true_positive": 0
+      },
+      "CREDIT_CARD": {
+        "f1": 1.0,
+        "false_negative": 0,
+        "false_positive": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "support": 240,
+        "true_positive": 240
+      },
+      "CRIMINAL": {
+        "f1": 0.0,
+        "false_negative": 96,
+        "false_positive": 0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "support": 96,
+        "true_positive": 0
+      },
+      "DOB": {
+        "f1": 0.0,
+        "false_negative": 288,
+        "false_positive": 0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "support": 288,
+        "true_positive": 0
+      },
+      "EMAIL": {
+        "f1": 1.0,
+        "false_negative": 0,
+        "false_positive": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "support": 336,
+        "true_positive": 336
+      },
+      "ETHNICITY": {
+        "f1": 0.2413793103448276,
+        "false_negative": 82,
+        "false_positive": 6,
+        "precision": 0.7,
+        "recall": 0.14583333333333334,
+        "support": 96,
+        "true_positive": 14
+      },
+      "HEALTH": {
+        "f1": 0.01652892561983471,
+        "false_negative": 238,
+        "false_positive": 0,
+        "precision": 1.0,
+        "recall": 0.008333333333333333,
+        "support": 240,
+        "true_positive": 2
+      },
+      "IBAN_OTHER": {
+        "f1": 1.0,
+        "false_negative": 0,
+        "false_positive": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "support": 192,
+        "true_positive": 192
+      },
+      "ORG": {
+        "f1": 0.4540229885057471,
+        "false_negative": 113,
+        "false_positive": 77,
+        "precision": 0.5064102564102564,
+        "recall": 0.4114583333333333,
+        "support": 192,
+        "true_positive": 79
+      },
+      "PERSON": {
+        "f1": 0.33618233618233617,
+        "false_negative": 687,
+        "false_positive": 12,
+        "precision": 0.9365079365079365,
+        "recall": 0.2048611111111111,
+        "support": 864,
+        "true_positive": 177
+      },
+      "POLITICAL": {
+        "f1": 0.020618556701030924,
+        "false_negative": 95,
+        "false_positive": 0,
+        "precision": 1.0,
+        "recall": 0.010416666666666666,
+        "support": 96,
+        "true_positive": 1
+      },
+      "RELIGION": {
+        "f1": 0.15384615384615385,
+        "false_negative": 88,
+        "false_positive": 0,
+        "precision": 1.0,
+        "recall": 0.08333333333333333,
+        "support": 96,
+        "true_positive": 8
+      },
+      "SECRET_API_KEY": {
+        "f1": 1.0,
+        "false_negative": 0,
+        "false_positive": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "support": 96,
+        "true_positive": 96
+      },
+      "SECRET_JWT": {
+        "f1": 1.0,
+        "false_negative": 0,
+        "false_positive": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "support": 96,
+        "true_positive": 96
+      },
+      "SECRET_PRIVATE_KEY": {
+        "f1": 1.0,
+        "false_negative": 0,
+        "false_positive": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "support": 48,
+        "true_positive": 48
+      },
+      "SEXUAL_LIFE": {
+        "f1": 0.0,
+        "false_negative": 96,
+        "false_positive": 0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "support": 96,
+        "true_positive": 0
+      },
+      "TR_IBAN": {
+        "f1": 1.0,
+        "false_negative": 0,
+        "false_positive": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "support": 240,
+        "true_positive": 240
+      },
+      "TR_PHONE": {
+        "f1": 1.0,
+        "false_negative": 0,
+        "false_positive": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "support": 336,
+        "true_positive": 336
+      },
+      "TR_PLATE": {
+        "f1": 1.0,
+        "false_negative": 0,
+        "false_positive": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "support": 240,
+        "true_positive": 240
+      },
+      "TR_SGK": {
+        "f1": 1.0,
+        "false_negative": 0,
+        "false_positive": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "support": 240,
+        "true_positive": 240
+      },
+      "TR_TCKN": {
+        "f1": 1.0,
+        "false_negative": 0,
+        "false_positive": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "support": 432,
+        "true_positive": 432
+      },
+      "TR_VKN": {
+        "f1": 1.0,
+        "false_negative": 0,
+        "false_positive": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "support": 192,
+        "true_positive": 192
+      },
+      "UNION": {
+        "f1": 0.2522522522522523,
+        "false_negative": 82,
+        "false_positive": 1,
+        "precision": 0.9333333333333333,
+        "recall": 0.14583333333333334,
+        "support": 96,
+        "true_positive": 14
+      }
+    }
+  },
+  "schema_version": 1,
+  "strict": {
+    "macro": {
+      "f1": 0.5398069404388756,
+      "precision": 0.6814950481617149,
+      "recall": 0.5263406635802469
+    },
+    "micro": {
+      "f1": 0.6894312853192256,
+      "false_negative": 2365,
+      "false_positive": 218,
+      "precision": 0.9293354943273906,
+      "recall": 0.547974006116208,
+      "support": 5232,
+      "true_positive": 2867
+    },
+    "mode": "strict",
+    "per_type": {
+      "ADDRESS": {
+        "f1": 0.020408163265306124,
+        "false_negative": 285,
+        "false_positive": 3,
+        "precision": 0.5,
+        "recall": 0.010416666666666666,
+        "support": 288,
+        "true_positive": 3
+      },
+      "BIOMETRIC_REF": {
+        "f1": 0.0,
+        "false_negative": 96,
+        "false_positive": 0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "support": 96,
+        "true_positive": 0
+      },
+      "CREDIT_CARD": {
+        "f1": 1.0,
+        "false_negative": 0,
+        "false_positive": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "support": 240,
+        "true_positive": 240
+      },
+      "CRIMINAL": {
+        "f1": 0.0,
+        "false_negative": 96,
+        "false_positive": 0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "support": 96,
+        "true_positive": 0
+      },
+      "DOB": {
+        "f1": 0.0,
+        "false_negative": 288,
+        "false_positive": 0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "support": 288,
+        "true_positive": 0
+      },
+      "EMAIL": {
+        "f1": 1.0,
+        "false_negative": 0,
+        "false_positive": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "support": 336,
+        "true_positive": 336
+      },
+      "ETHNICITY": {
+        "f1": 0.2413793103448276,
+        "false_negative": 82,
+        "false_positive": 6,
+        "precision": 0.7,
+        "recall": 0.14583333333333334,
+        "support": 96,
+        "true_positive": 14
+      },
+      "HEALTH": {
+        "f1": 0.01652892561983471,
+        "false_negative": 238,
+        "false_positive": 0,
+        "precision": 1.0,
+        "recall": 0.008333333333333333,
+        "support": 240,
+        "true_positive": 2
+      },
+      "IBAN_OTHER": {
+        "f1": 1.0,
+        "false_negative": 0,
+        "false_positive": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "support": 192,
+        "true_positive": 192
+      },
+      "ORG": {
+        "f1": 0.22988505747126434,
+        "false_negative": 152,
+        "false_positive": 116,
+        "precision": 0.2564102564102564,
+        "recall": 0.20833333333333334,
+        "support": 192,
+        "true_positive": 40
+      },
+      "PERSON": {
+        "f1": 0.20322886989553654,
+        "false_negative": 757,
+        "false_positive": 82,
+        "precision": 0.5661375661375662,
+        "recall": 0.12384259259259259,
+        "support": 864,
+        "true_positive": 107
+      },
+      "POLITICAL": {
+        "f1": 0.0,
+        "false_negative": 96,
+        "false_positive": 1,
+        "precision": 0.0,
+        "recall": 0.0,
+        "support": 96,
+        "true_positive": 0
+      },
+      "RELIGION": {
+        "f1": 0.15384615384615385,
+        "false_negative": 88,
+        "false_positive": 0,
+        "precision": 1.0,
+        "recall": 0.08333333333333333,
+        "support": 96,
+        "true_positive": 8
+      },
+      "SECRET_API_KEY": {
+        "f1": 1.0,
+        "false_negative": 0,
+        "false_positive": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "support": 96,
+        "true_positive": 96
+      },
+      "SECRET_JWT": {
+        "f1": 1.0,
+        "false_negative": 0,
+        "false_positive": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "support": 96,
+        "true_positive": 96
+      },
+      "SECRET_PRIVATE_KEY": {
+        "f1": 1.0,
+        "false_negative": 0,
+        "false_positive": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "support": 48,
+        "true_positive": 48
+      },
+      "SEXUAL_LIFE": {
+        "f1": 0.0,
+        "false_negative": 96,
+        "false_positive": 0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "support": 96,
+        "true_positive": 0
+      },
+      "TR_IBAN": {
+        "f1": 1.0,
+        "false_negative": 0,
+        "false_positive": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "support": 240,
+        "true_positive": 240
+      },
+      "TR_PHONE": {
+        "f1": 1.0,
+        "false_negative": 0,
+        "false_positive": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "support": 336,
+        "true_positive": 336
+      },
+      "TR_PLATE": {
+        "f1": 1.0,
+        "false_negative": 0,
+        "false_positive": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "support": 240,
+        "true_positive": 240
+      },
+      "TR_SGK": {
+        "f1": 1.0,
+        "false_negative": 0,
+        "false_positive": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "support": 240,
+        "true_positive": 240
+      },
+      "TR_TCKN": {
+        "f1": 1.0,
+        "false_negative": 0,
+        "false_positive": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "support": 432,
+        "true_positive": 432
+      },
+      "TR_VKN": {
+        "f1": 1.0,
+        "false_negative": 0,
+        "false_positive": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "support": 192,
+        "true_positive": 192
+      },
+      "UNION": {
+        "f1": 0.0900900900900901,
+        "false_negative": 91,
+        "false_positive": 10,
+        "precision": 0.3333333333333333,
+        "recall": 0.052083333333333336,
+        "support": 96,
+        "true_positive": 5
+      }
+    }
+  }
+}

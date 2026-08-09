@@ -21,9 +21,9 @@ fi
 "$pnpm_cmd" depcruise
 "$pnpm_cmd" depcruise:fixture
 
-uv run ruff format --check core tools scripts/fetch-models.py
-uv run ruff check core tools scripts/fetch-models.py
-uv run mypy core/src
+uv run ruff format --check bench core tools scripts/fetch-models.py
+uv run ruff check bench core tools scripts/fetch-models.py
+uv run mypy bench/src core/src
 uv run pytest
 uv run lint-imports
 uv run python tools/codegen/generate.py --check

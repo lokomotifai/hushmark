@@ -4,7 +4,7 @@ version = "0.1.0"
 requires-python = ">=3.12,<3.13"
 
 [tool.uv.workspace]
-members = ["core", "tools/codegen"]
+members = ["bench", "core", "tools/codegen"]
 
 [dependency-groups]
 dev = [
@@ -20,7 +20,7 @@ dev = [
 
 [tool.pytest.ini_options]
 addopts = "-ra --strict-config --strict-markers"
-testpaths = ["core/tests", "tools/codegen/tests"]
+testpaths = ["bench/tests", "core/tests", "tools/codegen/tests"]
 markers = [
   "net_required: requires external network access",
   "integration: requires local services or containers",
@@ -46,11 +46,11 @@ quote-style = "double"
 [tool.mypy]
 python_version = "3.12"
 strict = true
-packages = ["hushmark_core"]
-mypy_path = ["core/src"]
+packages = ["hushmark_bench", "hushmark_core"]
+mypy_path = ["bench/src", "core/src"]
 
 [tool.importlinter]
-root_packages = ["hushmark_core"]
+root_packages = ["hushmark_bench", "hushmark_core"]
 include_external_packages = true
 
 [[tool.importlinter.contracts]]
