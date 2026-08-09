@@ -1,0 +1,15 @@
+[project]
+name = "hushmark-sdk"
+version = "0.1.0"
+description = "Typed Python client for self-hosted Hushmark services"
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+license = "Apache-2.0"
+dependencies = ["httpx>=0.28.0"]
+
+[build-system]
+requires = ["hatchling>=1.27.0"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/hushmark_sdk"]

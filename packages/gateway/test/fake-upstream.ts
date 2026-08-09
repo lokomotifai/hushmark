@@ -15,9 +15,28 @@ export class FakeUpstream implements UpstreamPort {
       kind === "openai"
         ? {
             id: "chatcmpl-test",
-            choices: [{ index: 0, message: { role: "assistant", content: text } }],
+            object: "chat.completion",
+            created: 1_786_300_000,
+            model: "test",
+            choices: [
+              {
+                index: 0,
+                message: { role: "assistant", content: text },
+                finish_reason: "stop",
+              },
+            ],
+            usage: { prompt_tokens: 8, completion_tokens: 8, total_tokens: 16 },
           }
-        : { id: "msg-test", type: "message", content: [{ type: "text", text }] };
+        : {
+            id: "msg-test",
+            type: "message",
+            role: "assistant",
+            model: "test",
+            stop_reason: "end_turn",
+            stop_sequence: null,
+            content: [{ type: "text", text }],
+            usage: { input_tokens: 8, output_tokens: 8 },
+          };
     return jsonResponse(response);
   }
 }

@@ -38,7 +38,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ["packages/gateway/test/**/*.ts"],
+    files: ["packages/gateway/test/**/*.ts", "examples/nextjs-chat/test/**/*.ts"],
     rules: {
       "@typescript-eslint/no-misused-spread": "off",
       "@typescript-eslint/no-unsafe-assignment": "off",

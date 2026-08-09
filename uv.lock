@@ -7,6 +7,7 @@ members = [
     "hushmark-bench",
     "hushmark-codegen",
     "hushmark-core",
+    "hushmark-sdk",
     "hushmark-workspace",
 ]
 
@@ -493,6 +494,17 @@ requires-dist = [
     { name = "structlog", specifier = ">=25.4.0" },
     { name = "uvicorn", specifier = ">=0.35.0" },
 ]
+
+[[package]]
+name = "hushmark-sdk"
+version = "0.1.0"
+source = { editable = "sdk-py" }
+dependencies = [
+    { name = "httpx" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "httpx", specifier = ">=0.28.0" }]
 
 [[package]]
 name = "hushmark-workspace"

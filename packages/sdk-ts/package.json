@@ -1,0 +1,39 @@
+{
+  "name": "@hushmark/ai-sdk",
+  "version": "0.1.0",
+  "description": "Typed TypeScript client for a self-hosted Hushmark gateway",
+  "type": "module",
+  "license": "Apache-2.0",
+  "engines": {
+    "node": "22.x"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsup src/index.ts --format esm --dts --clean",
+    "lint": "eslint src test",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "peerDependencies": {
+    "ai": ">=7.0.0 <8.0.0"
+  },
+  "dependencies": {
+    "@ai-sdk/provider": "4.0.4",
+    "@hushmark/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "ai": "7.0.40",
+    "tsup": "^8.5.1",
+    "vitest": "^4.0.18"
+  }
+}
