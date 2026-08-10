@@ -14,5 +14,5 @@ packages and uses semantic versioning before 1.0 with breaking changes permitted
 - Added reproducible benchmark, model-training smoke pipeline, Docker/Compose/Helm packaging,
   signed-image/SBOM workflows, performance gates, and local release tooling.
 
-This is a locally verified release candidate. External publication and production signing remain
-pending the authorization checkpoints recorded in `PLAN.md`.
+This is a locally verified release candidate. External publication and production signing require
+explicit authorization.
