@@ -14,5 +14,6 @@ packages and uses semantic versioning before 1.0 with breaking changes permitted
 - Added reproducible benchmark, model-training smoke pipeline, Docker/Compose/Helm packaging,
   signed-image/SBOM workflows, performance gates, and local release tooling.
 
-This is a locally verified release candidate. External publication and production signing require
-explicit authorization.
+The open-core source, SDK packages, and signed container images are released through the Hushmark
+GitHub organization. Model weights remain a separately verified artifact and are never fetched
+implicitly by production startup.

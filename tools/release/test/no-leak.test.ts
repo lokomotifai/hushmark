@@ -28,6 +28,7 @@ describe("public mirror extraction", () => {
         ".dependency-cruiser.cjs",
         ".dependency-cruiser.fixture.cjs",
         ".editorconfig",
+        ".github",
         ".gitignore",
         ".nvmrc",
         ".prettierignore",
@@ -46,6 +47,7 @@ describe("public mirror extraction", () => {
         "pnpm-lock.yaml",
         "pnpm-workspace.yaml",
         "pyproject.toml",
+        "renovate.json",
         "scripts",
         "sdk-py",
         "taxonomy",
@@ -56,6 +58,12 @@ describe("public mirror extraction", () => {
       ]),
     );
     expect(await readFile(join(output, "LICENSE"), "utf8")).toContain("Apache License");
+    expect(await readFile(join(output, ".github/workflows/ci.yml"), "utf8")).toContain(
+      "./scripts/verify.sh",
+    );
+    expect(await readFile(join(output, ".github/workflows/release.yml"), "utf8")).toContain(
+      "npm publish dist/npm/hushmark-shared-0.1.0.tgz",
+    );
     await expect(
       readFile(join(output, "bench/train/outputs/smoke-verdict.json")),
     ).rejects.toThrow();

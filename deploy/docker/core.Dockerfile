@@ -12,6 +12,7 @@ RUN python -m pip install --no-cache-dir "uv==${UV_VERSION}"
 COPY pyproject.toml uv.lock .python-version ./
 COPY bench/pyproject.toml bench/pyproject.toml
 COPY core/pyproject.toml core/pyproject.toml
+COPY core/README.md core/README.md
 COPY sdk-py/pyproject.toml sdk-py/pyproject.toml
 COPY tools/codegen/pyproject.toml tools/codegen/pyproject.toml
 COPY core/src core/src

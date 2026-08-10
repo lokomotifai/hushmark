@@ -30,6 +30,7 @@ const ROOT_FILES = [
   "package.json",
   "pnpm-lock.yaml",
   "pyproject.toml",
+  "renovate.json",
   "tsconfig.base.json",
   "turbo.json",
   "uv.lock",
@@ -162,6 +163,130 @@ echo "Standalone public-mirror verification passed."
 `;
 }
 
+function publicCiWorkflow(): string {
+  return `name: open-core-ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+      - run: ./scripts/bootstrap.sh
+      - run: ./scripts/verify.sh
+`;
+}
+
+function publicReleaseWorkflow(): string {
+  return `name: release
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Package registry target
+        required: true
+        default: all
+        type: choice
+        options:
+          - all
+          - npm
+          - pypi
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-\${{ inputs.target }}
+  cancel-in-progress: false
+
+jobs:
+  npm:
+    if: \${{ inputs.target == 'all' || inputs.target == 'npm' }}
+    runs-on: ubuntu-latest
+    environment: npm
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+      - run: npm install --global npm@11.5.1
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @hushmark/shared build && pnpm --filter @hushmark/ai-sdk build
+      - name: Pack and inspect public npm packages
+        run: |
+          mkdir -p dist/npm
+          pnpm --filter @hushmark/shared pack --pack-destination "$GITHUB_WORKSPACE/dist/npm"
+          pnpm --filter @hushmark/ai-sdk pack --pack-destination "$GITHUB_WORKSPACE/dist/npm"
+          tar -tzf dist/npm/hushmark-shared-0.1.0.tgz
+          tar -tzf dist/npm/hushmark-ai-sdk-0.1.0.tgz
+      - name: Publish with npm trusted publishing
+        run: |
+          npm publish dist/npm/hushmark-shared-0.1.0.tgz --access public --provenance
+          npm publish dist/npm/hushmark-ai-sdk-0.1.0.tgz --access public --provenance
+
+  pypi-core:
+    if: \${{ inputs.target == 'all' || inputs.target == 'pypi' }}
+    runs-on: ubuntu-latest
+    environment: pypi-core
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+      - run: uv build --package hushmark-core --out-dir dist/core
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/core
+
+  pypi-sdk:
+    if: \${{ inputs.target == 'all' || inputs.target == 'pypi' }}
+    runs-on: ubuntu-latest
+    environment: pypi-sdk
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+      - run: uv build --package hushmark-sdk --out-dir dist/sdk
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/sdk
+`;
+}
+
 async function writeGeneratedFiles(repoRoot: string, output: string): Promise<void> {
   const packageJson = JSON.parse(await readFile(join(repoRoot, "package.json"), "utf8")) as Record<
     string,
@@ -175,6 +300,9 @@ async function writeGeneratedFiles(repoRoot: string, output: string): Promise<vo
   await mkdir(join(output, "scripts"), { recursive: true });
   await writeFile(join(output, "scripts/bootstrap.sh"), publicBootstrap(), { mode: 0o755 });
   await writeFile(join(output, "scripts/verify.sh"), publicVerify(), { mode: 0o755 });
+  await mkdir(join(output, ".github/workflows"), { recursive: true });
+  await writeFile(join(output, ".github/workflows/ci.yml"), publicCiWorkflow());
+  await writeFile(join(output, ".github/workflows/release.yml"), publicReleaseWorkflow());
 }
 
 async function listFiles(root: string, path = root): Promise<string[]> {

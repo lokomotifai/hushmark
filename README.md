@@ -22,7 +22,7 @@ Tedbir report are enterprise surfaces and are not part of the extracted open-cor
 ## Start locally
 
 Prerequisites are Node.js 22, pnpm 9, Python 3.12, uv, and Docker.
-The adopted `hushmark-tr` artifact is distributed separately from source until AC-2; install the
+The adopted `hushmark-tr` artifact is distributed separately from source; install the
 verified artifact under `models/hushmark-tr/` or use the air-gap bundle. Bootstrap verifies its
 pinned FP32 ONNX graph and never regenerates a production model implicitly.
 
@@ -37,6 +37,6 @@ See [Compose installation](docs/install-compose.md), [Helm installation](docs/in
 
 ## License intent
 
-Each package carries its own license file. Open-core packages are Apache-2.0-intended. Enterprise
-packages remain proprietary. No repository or package has been externally published as part of
-the local v0.1.0 release-candidate work.
+Each package carries its own license file. Open-core packages are Apache-2.0 and are released from
+the `hushmark/hushmark-open-core` mirror. Enterprise packages remain proprietary. Published
+artifacts include cryptographic provenance and should be verified before deployment.
