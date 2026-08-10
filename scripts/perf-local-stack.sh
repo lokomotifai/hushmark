@@ -32,6 +32,7 @@ HUSHMARK_CORE_URL=http://127.0.0.1:8000 \
 HUSHMARK_OPENAI_UPSTREAM=http://127.0.0.1:9000/v1 \
 HUSHMARK_ANTHROPIC_UPSTREAM=http://127.0.0.1:9000/v1 \
 HUSHMARK_POLICY_PATH=packages/gateway/policy.yaml \
+  env -u HUSHMARK_PERF_LIMIT_MULTIPLIER \
   node packages/gateway/dist/cli.js >"$run_dir/gateway.log" 2>&1 &
 processes+=("$!")
 
