@@ -242,8 +242,8 @@ jobs:
       - name: Pack and inspect public npm packages
         run: |
           mkdir -p dist/npm
-          pnpm --filter @hushmark/shared pack --pack-destination "$GITHUB_WORKSPACE/dist/npm"
-          pnpm --filter @hushmark/ai-sdk pack --pack-destination "$GITHUB_WORKSPACE/dist/npm"
+          pnpm --dir packages/shared pack --pack-destination "$GITHUB_WORKSPACE/dist/npm"
+          pnpm --dir packages/sdk-ts pack --pack-destination "$GITHUB_WORKSPACE/dist/npm"
           tar -tzf dist/npm/hushmark-shared-0.1.0.tgz
           tar -tzf dist/npm/hushmark-ai-sdk-0.1.0.tgz
       - name: Publish with npm trusted publishing
