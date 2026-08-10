@@ -73,7 +73,10 @@ jobs:
           cosign verify --allow-insecure-registry --insecure-ignore-tlog \
             --key cosign.pub "$image_ref"
           cosign verify-attestation --allow-insecure-registry --key cosign.pub \
-            --insecure-ignore-tlog --type cyclonedx "$image_ref"
+            --insecure-ignore-tlog --type cyclonedx "$image_ref" \
+            > "${{ matrix.name }}.verified-attestation.json"
+          jq -e 'type == "array" and length > 0' \
+            "${{ matrix.name }}.verified-attestation.json" > /dev/null
       - name: Enforce vulnerability and corpus budgets
         run: |
           image="localhost:5000/hushmark/${{ matrix.name }}:0.1.0"
@@ -90,3 +93,4 @@ jobs:
             ${{ matrix.name }}.cdx.json
             ${{ matrix.name }}.spdx.json
             ${{ matrix.name }}.grype.json
+            ${{ matrix.name }}.verified-attestation.json
