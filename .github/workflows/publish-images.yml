@@ -13,7 +13,6 @@ permissions:
   contents: read
   packages: write
   id-token: write
-  attestations: write
 
 concurrency:
   group: publish-images-${{ inputs.version }}
@@ -105,12 +104,6 @@ jobs:
           jq -e --arg digest "${DIGEST#sha256:}" \
             '.predicateType == "https://cyclonedx.org/bom" and any(.subject[]; .digest.sha256 == $digest)' \
             "${{ matrix.name }}.verified-statement.json" > /dev/null
-      - name: Publish GitHub artifact provenance
-        uses: actions/attest-build-provenance@v3
-        with:
-          subject-name: ghcr.io/hushmark/${{ matrix.name }}
-          subject-digest: ${{ steps.build.outputs.digest }}
-          push-to-registry: true
       - uses: actions/upload-artifact@v4
         with:
           name: release-evidence-${{ matrix.name }}-${{ inputs.version }}
