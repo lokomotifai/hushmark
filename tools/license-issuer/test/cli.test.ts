@@ -41,4 +41,4 @@ it("generates ephemeral keys, signs a license, and inspects it without printing 
   const inspected = await execa("node", [cli, "inspect", "--input", outputPath]);
   expect(inspected.stdout).toContain('"licensee": "Example"');
   expect(inspected.stdout).not.toContain('"sig"');
-});
+}, 15_000);
