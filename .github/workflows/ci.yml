@@ -2,6 +2,8 @@ name: ci
 
 on:
   push:
+    branches: [main]
+    tags: ["v*"]
   pull_request:
 
 permissions:
@@ -35,11 +37,16 @@ jobs:
       - uses: astral-sh/setup-uv@v6
         with:
           python-version: "3.12"
-      - run: uv sync --frozen
+      - run: uv sync --all-packages --frozen
       - run: uv run ruff format --check core tools/codegen
       - run: uv run ruff check core tools/codegen
       - run: uv run mypy core/src
-      - run: uv run pytest
+      - name: Run source-only Python tests
+        run: |
+          uv run pytest \
+            --deselect=core/tests/test_ner_backends.py::test_torch_backend_detects_turkish_person_from_offline_model \
+            --deselect=core/tests/test_ner_backends.py::test_torch_and_onnx_backends_have_span_parity_on_turkish_fixture \
+            --deselect=sdk-py/tests/test_integration.py::test_python_sdk_and_batch_example_against_real_local_stack
       - run: uv run lint-imports
       - run: uv run python tools/codegen/generate.py --check
       - run: uv run python tools/codegen/claims_lint.py
@@ -89,7 +96,7 @@ jobs:
         with:
           python-version: "3.12"
       - run: pnpm install --frozen-lockfile
-      - run: uv sync --frozen
+      - run: uv sync --package hushmark-core --frozen
       - run: pnpm --filter @hushmark/shared build && pnpm --filter @hushmark/gateway build
       - run: |
           curl -fsSLo k6.tar.gz https://github.com/grafana/k6/releases/download/v2.1.0/k6-v2.1.0-linux-amd64.tar.gz

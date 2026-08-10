@@ -131,7 +131,7 @@ uv run ruff format --check bench core sdk-py tools
 uv run ruff check bench core sdk-py tools
 uv run mypy bench/src core/src sdk-py/src
 pytest_args=()
-model_weights=models/gliner_multi_pii-v1/pytorch_model.bin
+model_weights=models/hushmark-tr/pytorch_model.bin
 if [[ ! -f "$model_weights" ]]; then
   pytest_args+=(
     --deselect=core/tests/test_ner_backends.py::test_torch_backend_detects_turkish_person_from_offline_model

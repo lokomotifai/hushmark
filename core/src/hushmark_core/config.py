@@ -26,10 +26,10 @@ class Settings(BaseSettings):
     ner_backend: Literal["disabled", "torch", "onnx"] = "torch"
     ner_threshold: float = Field(default=0.55, ge=0.0, le=1.0)
     ner_thresholds: dict[str, float] = Field(default_factory=dict)
-    model_id: str = "gliner_multi_pii-v1"
+    model_id: str = "hushmark-tr"
     model_root: Path = Path(__file__).resolve().parents[3] / "models"
     model_registry: Path = Path(__file__).resolve().parents[2] / "models.yaml"
-    onnx_model_file: str = "model_quantized.onnx"
+    onnx_model_file: str = "model.onnx"
 
     @field_validator("ner_thresholds")
     @classmethod

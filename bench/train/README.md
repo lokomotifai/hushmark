@@ -15,13 +15,15 @@ uv run python bench/train/evaluate.py \
   --report bench/train/outputs/smoke-verdict.json
 ```
 
-Smoke mode uses exactly 200 deterministic examples after the eight repetitions locked by
-`hushmark-bench-v0`. It runs one CPU epoch with the transformer encoder frozen. Smoke checkpoints
-are never adoption-eligible.
+Smoke mode uses exactly 200 deterministic examples after both the eight repetitions locked by
+`hushmark-bench-v0` and the four repetitions reserved for development. It runs one CPU epoch with
+the transformer encoder frozen. Smoke checkpoints are never adoption-eligible.
 
 ## Full synthetic preparation
 
 ```bash
+uv run python bench/train/synthesize_dev.py \
+  --output bench/train/outputs/synthetic-dev.jsonl
 uv run python bench/train/synthesize.py \
   --profile full \
   --output bench/train/outputs/synthetic-full.jsonl
@@ -31,10 +33,11 @@ uv run python bench/train/prepare_gliner.py \
   --output bench/train/outputs/synthetic-full-gliner.jsonl
 ```
 
-The `full` profile skips all 2,016 locked evaluation rows before yielding 200,592 balanced
-examples. Full training then rejects evaluation-source labels, colliding record IDs, and identical
-model-visible content. The earlier `legacy` synthesis profile exists only to reproduce historical
-WP-10 evidence and must not be used for a full run.
+The development profile reserves 1,008 rows immediately after the 2,016 locked evaluation rows.
+The `full` profile skips both ranges before yielding 200,592 examples. Full training rejects
+evaluation/development source labels, colliding record IDs, and identical model-visible content.
+The earlier `legacy` synthesis profile exists only to reproduce historical WP-10 evidence and must
+not be used for a full run.
 
 ## AI4Privacy Turkish bootstrap (`net-required`, optional)
 
@@ -56,11 +59,13 @@ be recorded with any run that uses it. External download is not part of required
 
 ## GPU execution
 
-The guarded full path supports CUDA BF16/FP16 autocast, bounded pilots, atomic checkpoints,
-retention, Ctrl-C checkpointing, compatible-run fingerprints, and `--resume-from latest`. A
-max-step-limited pilot is mechanically ineligible for adoption. A completed candidate is still
-adopted only when full locked-benchmark evaluation improves NER macro strict-F1 by at least 0.05
-and no NER type loses more than 0.02 strict-F1.
+The guarded full path freezes the text encoder by default, uses separate encoder/head learning
+rates when it is deliberately unfrozen, applies warm-up plus linear decay, caps rare-label
+oversampling, and evaluates NER-only development metrics every 100 steps. It atomically retains the
+best development checkpoint and stops early after five non-improving validations. A max-step pilot
+is mechanically ineligible. A full checkpoint becomes final-evaluation eligible only when its
+development result improves NER macro strict-F1 by at least 0.05 with no per-type loss over 0.02;
+the same binding rule is then applied once to the locked benchmark.
 
 Use the exact provider settings, transfer controls, pilot/full commands, resume procedure, and
 evidence checklist in [`docs/train-runpod.md`](../../docs/train-runpod.md).

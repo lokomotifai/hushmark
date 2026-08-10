@@ -6,7 +6,7 @@ FROM ${BASE_IMAGE}
 COPY --chown=10001:10001 \
   gliner_config.json \
   gliner_config.source.json \
-  model_quantized.onnx \
+  model.onnx \
   tokenizer.json \
   tokenizer_config.json \
-  /models/gliner_multi_pii-v1/
+  /models/hushmark-tr/

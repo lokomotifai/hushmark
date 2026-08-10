@@ -18,6 +18,7 @@ class ModelSpec:
     id: str
     source: str
     revision: str
+    distribution: str
     sha256: str
     labels: dict[str, str]
     onnx_confidence_scale: float
@@ -48,6 +49,9 @@ def load_model_spec(registry_path: Path, model_id: str) -> ModelSpec:
         )
         if not isinstance(weight, dict) or not isinstance(weight.get("sha256"), str):
             raise ValueError(f"model {model_id} has no pinned weight SHA-256")
+        distribution = str(model.get("distribution", "remote"))
+        if distribution not in {"remote", "local-artifact"}:
+            raise ValueError(f"model {model_id} has an invalid distribution")
         string_labels = {str(entity_type): str(label) for entity_type, label in labels.items()}
         onnx_confidence_scale = float(model.get("onnx_confidence_scale", 1.0))
         if not 0.0 < onnx_confidence_scale <= 1.0:
@@ -70,6 +74,7 @@ def load_model_spec(registry_path: Path, model_id: str) -> ModelSpec:
             id=model_id,
             source=str(model["source"]),
             revision=str(model["revision"]),
+            distribution=distribution,
             sha256=weight["sha256"],
             labels=string_labels,
             onnx_confidence_scale=onnx_confidence_scale,

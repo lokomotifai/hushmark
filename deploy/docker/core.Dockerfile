@@ -19,13 +19,15 @@ RUN uv sync --frozen --no-dev --no-editable --package hushmark-core
 
 FROM build AS model-build
 COPY core/models.yaml core/models.yaml
-COPY scripts/fetch-models.py scripts/fetch-models.py
 COPY tools/export-onnx.py tools/export-onnx.py
-RUN uv run python scripts/fetch-models.py \
-    && uv run python tools/export-onnx.py \
-    && rm -f \
-      models/gliner_multi_pii-v1/model.onnx \
-      models/gliner_multi_pii-v1/pytorch_model.bin
+COPY models/hushmark-tr/gliner_config.json models/hushmark-tr/gliner_config.json
+COPY models/hushmark-tr/model.onnx models/hushmark-tr/model.onnx
+COPY models/hushmark-tr/tokenizer.json models/hushmark-tr/tokenizer.json
+COPY models/hushmark-tr/tokenizer_config.json models/hushmark-tr/tokenizer_config.json
+RUN uv run python tools/export-onnx.py \
+      --model-id hushmark-tr \
+      --output model.onnx \
+      --verify-only
 
 FROM ${PYTHON_IMAGE} AS runtime
 ARG HUSHMARK_UID=10001

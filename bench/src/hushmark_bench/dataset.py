@@ -89,11 +89,12 @@ class Example:
 
 
 class ValueFactory:
-    def __init__(self, seed: int) -> None:
+    def __init__(self, seed: int, *, unique_other_ibans: bool = False) -> None:
         self.random = random.Random(seed)
         Faker.seed(seed)
         self.fake = Faker("tr_TR")
         self.index = 0
+        self.unique_other_ibans = unique_other_ibans
 
     def value(self, entity_type: str, morphology: str) -> str:
         self.index += 1
@@ -147,6 +148,14 @@ class ValueFactory:
         return f"TR{check:02d}{bban}"
 
     def other_iban(self) -> str:
+        if self.unique_other_ibans:
+            # The locked benchmark intentionally uses a tiny pair of foreign-IBAN
+            # fixtures. Full training needs model-visible content that cannot repeat
+            # those fixtures, so give each generated row a deterministic valid German
+            # IBAN without changing the legacy benchmark generator.
+            bban = f"{self.index:018d}"
+            check = 98 - int(f"{bban}131400") % 97
+            return f"DE{check:02d}{bban}"
         return self.random.choice(("GB82WEST12345698765432", "DE89370400440532013000"))
 
     def credit_card(self) -> str:
@@ -241,13 +250,18 @@ def render(template: Template, factory: ValueFactory, morphology: str, row: int)
     )
 
 
-def generate_examples(seed: int, repetitions: int = 8) -> Iterator[Example]:
+def generate_examples(
+    seed: int,
+    repetitions: int = 8,
+    *,
+    unique_other_ibans: bool = False,
+) -> Iterator[Example]:
     templates_per_domain = {
         domain: sum(template.domain == domain for template in TEMPLATES) for domain in DOMAINS
     }
     if len(DOMAINS) != 6 or any(count < 40 for count in templates_per_domain.values()):
         raise AssertionError("benchmark requires at least 40 templates in each of six domains")
-    factory = ValueFactory(seed)
+    factory = ValueFactory(seed, unique_other_ibans=unique_other_ibans)
     row = 0
     for repetition in range(repetitions):
         for template in TEMPLATES:

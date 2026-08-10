@@ -22,6 +22,9 @@ Tedbir report are enterprise surfaces and are not part of the extracted open-cor
 ## Start locally
 
 Prerequisites are Node.js 22, pnpm 9, Python 3.12, uv, and Docker.
+The adopted `hushmark-tr` artifact is distributed separately from source until AC-2; install the
+verified artifact under `models/hushmark-tr/` or use the air-gap bundle. Bootstrap verifies its
+pinned FP32 ONNX graph and never regenerates a production model implicitly.
 
 ```bash
 ./scripts/bootstrap.sh

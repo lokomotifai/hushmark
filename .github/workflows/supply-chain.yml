@@ -2,6 +2,8 @@ name: supply-chain
 
 on:
   push:
+    branches: [main]
+    tags: ["v*"]
   pull_request:
 
 permissions:
@@ -31,7 +33,7 @@ jobs:
           driver-opts: network=host
       - uses: sigstore/cosign-installer@v4.1.2
         with:
-          cosign-release: v3.0.6
+          cosign-release: v3.1.3
       - name: Install Syft and Grype
         run: |
           curl -sSfL https://raw.githubusercontent.com/anchore/syft/v1.50.0/install.sh | sudo sh -s -- -b /usr/local/bin v1.50.0
@@ -49,6 +51,7 @@ jobs:
             --sbom=true \
             --push .
       - name: Generate and attach SBOMs
+        timeout-minutes: 15
         run: |
           image="localhost:5000/hushmark/${{ matrix.name }}:0.1.0"
           digest="$(docker buildx imagetools inspect "$image" | awk '/^Digest:/ {print $2; exit}')"
@@ -58,14 +61,25 @@ jobs:
             -o "spdx-json=${{ matrix.name }}.spdx.json"
           export COSIGN_PASSWORD=hushmark-ci-ephemeral
           cosign generate-key-pair
-          cosign sign --yes --allow-insecure-registry --key cosign.key "$image_ref"
-          cosign attest --yes --allow-insecure-registry --key cosign.key \
+          cosign sign --yes --allow-insecure-registry --use-signing-config=false \
+            --tlog-upload=false \
+            --key cosign.key "$image_ref"
+          cosign attest --yes --allow-insecure-registry --use-signing-config=false \
+            --key cosign.key \
             --type cyclonedx --predicate "${{ matrix.name }}.cdx.json" "$image_ref"
-          cosign attest --yes --allow-insecure-registry --key cosign.key \
+          cosign attest --yes --allow-insecure-registry --use-signing-config=false \
+            --key cosign.key \
             --type spdxjson --predicate "${{ matrix.name }}.spdx.json" "$image_ref"
-          cosign verify --allow-insecure-registry --key cosign.pub "$image_ref"
+          cosign verify --allow-insecure-registry --insecure-ignore-tlog \
+            --key cosign.pub "$image_ref"
           cosign verify-attestation --allow-insecure-registry --key cosign.pub \
-            --type cyclonedx "$image_ref"
+            --insecure-ignore-tlog --type cyclonedx "$image_ref" \
+            > "${{ matrix.name }}.verified-attestation.json"
+          jq -er '.payload' "${{ matrix.name }}.verified-attestation.json" \
+            | base64 --decode > "${{ matrix.name }}.verified-statement.json"
+          jq -e --arg digest "${digest#sha256:}" \
+            '.predicateType == "https://cyclonedx.org/bom" and any(.subject[]; .digest.sha256 == $digest)' \
+            "${{ matrix.name }}.verified-statement.json" > /dev/null
       - name: Enforce vulnerability and corpus budgets
         run: |
           image="localhost:5000/hushmark/${{ matrix.name }}:0.1.0"
@@ -82,3 +96,5 @@ jobs:
             ${{ matrix.name }}.cdx.json
             ${{ matrix.name }}.spdx.json
             ${{ matrix.name }}.grype.json
+            ${{ matrix.name }}.verified-attestation.json
+            ${{ matrix.name }}.verified-statement.json

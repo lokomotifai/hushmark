@@ -11,13 +11,13 @@ Secrets should come from a secret manager or Kubernetes Secret, never a committe
 | ------------------------------- | ------------------------- | ----------------------------------------- |
 | `HUSHMARK_CORE_HOST`            | `0.0.0.0`                 | Validated core `host` setting.            |
 | `HUSHMARK_CORE_LOG_LEVEL`       | `info`                    | Validated core `log_level` setting.       |
-| `HUSHMARK_CORE_MODEL_ID`        | `gliner_multi_pii-v1`     | Validated core `model_id` setting.        |
+| `HUSHMARK_CORE_MODEL_ID`        | `hushmark-tr`             | Validated core `model_id` setting.        |
 | `HUSHMARK_CORE_MODEL_REGISTRY`  | `<repo>/core/models.yaml` | Validated core `model_registry` setting.  |
 | `HUSHMARK_CORE_MODEL_ROOT`      | `<repo>/models`           | Validated core `model_root` setting.      |
 | `HUSHMARK_CORE_NER_BACKEND`     | `torch`                   | Validated core `ner_backend` setting.     |
 | `HUSHMARK_CORE_NER_THRESHOLD`   | `0.55`                    | Validated core `ner_threshold` setting.   |
 | `HUSHMARK_CORE_NER_THRESHOLDS`  | `dynamic`                 | Validated core `ner_thresholds` setting.  |
-| `HUSHMARK_CORE_ONNX_MODEL_FILE` | `model_quantized.onnx`    | Validated core `onnx_model_file` setting. |
+| `HUSHMARK_CORE_ONNX_MODEL_FILE` | `model.onnx`              | Validated core `onnx_model_file` setting. |
 | `HUSHMARK_CORE_PORT`            | `8000`                    | Validated core `port` setting.            |
 
 ## Gateway

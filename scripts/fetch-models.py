@@ -54,12 +54,21 @@ def main() -> int:
         source = model["source"]
         revision = model["revision"]
         target_dir = MODEL_ROOT / model_id
+        distribution = model.get("distribution", "remote")
+        if distribution not in {"remote", "local-artifact"}:
+            raise ValueError(f"invalid model distribution: {model_id}")
+        local_artifact = distribution == "local-artifact"
+        if local_artifact and not target_dir.is_dir():
+            print(f"skipping unpublished local model artifact: {target_dir.relative_to(ROOT)}")
+            continue
         target_dir.mkdir(parents=True, exist_ok=True)
         for file_spec in model["files"]:
             target = target_dir / file_spec["path"]
             if validate_file(target, file_spec):
                 print(f"verified existing model file: {target.relative_to(ROOT)}")
                 continue
+            if local_artifact:
+                raise ValueError(f"local model artifact failed verification: {target}")
             url = (
                 f"https://huggingface.co/{source}/resolve/{revision}/"
                 f"{file_spec.get('remote_path', file_spec['path'])}?download=true"

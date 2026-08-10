@@ -9,6 +9,8 @@ mode and the bundled evaluation credentials are not production configuration.
 - Docker Engine with Compose v2.
 - At least 8 GiB available memory for the ONNX model stack.
 - No host ports 3000 or 8080 already in use.
+- The separately delivered, hash-verified `models/hushmark-tr/` runtime artifact. The source tree
+  does not download or regenerate the adopted model; the air-gap bundle already contains it.
 
 ## Evaluation
 

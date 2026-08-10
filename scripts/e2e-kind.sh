@@ -16,6 +16,21 @@ cleanup() {
 }
 trap cleanup EXIT
 
+diagnostics() {
+  local exit_code=$?
+  trap - ERR
+  if kubectl get namespace "$namespace" >/dev/null 2>&1; then
+    echo "kind failure diagnostics:" >&2
+    kubectl -n "$namespace" get pods -o wide >&2 || true
+    kubectl -n "$namespace" get events --sort-by=.lastTimestamp >&2 || true
+    for deployment in hushmark-core hushmark-gateway hushmark-console; do
+      kubectl -n "$namespace" logs "deployment/$deployment" --tail=200 >&2 || true
+    done
+  fi
+  return "$exit_code"
+}
+trap diagnostics ERR
+
 if (($# > 0)); then
   if [[ $# -ne 2 || $1 != "--airgap" ]]; then
     echo "usage: $0 [--airgap PATH]" >&2
@@ -98,14 +113,22 @@ helm upgrade --install hushmark deploy/helm/hushmark \
   --set core.image.tag=0.1.0 \
   --set core.image.pullPolicy=Never \
   --set core.nerBackend=disabled \
+  --set core.resources.requests.cpu=100m \
+  --set core.resources.requests.memory=512Mi \
   --set gateway.image.pullPolicy=Never \
+  --set gateway.resources.requests.cpu=50m \
+  --set gateway.resources.requests.memory=128Mi \
   --set gateway.openaiUpstream=http://fake-upstream:9000/v1 \
   --set gateway.anthropicUpstream=http://fake-upstream:9000/v1 \
   --set console.image.pullPolicy=Never \
+  --set console.resources.requests.cpu=50m \
+  --set console.resources.requests.memory=128Mi \
   --set enterprise.enabled=true \
   --set enterprise.kms.vaultAddress=http://vault:8200 \
   --set postgres.enabled=true \
   --set postgres.persistence.enabled=false \
+  --set postgres.resources.requests.cpu=50m \
+  --set postgres.resources.requests.memory=128Mi \
   --wait --timeout 5m
 
 kubectl -n "$namespace" rollout status deployment/fake-upstream --timeout=120s
