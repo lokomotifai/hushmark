@@ -113,14 +113,22 @@ helm upgrade --install hushmark deploy/helm/hushmark \
   --set core.image.tag=0.1.0 \
   --set core.image.pullPolicy=Never \
   --set core.nerBackend=disabled \
+  --set core.resources.requests.cpu=100m \
+  --set core.resources.requests.memory=512Mi \
   --set gateway.image.pullPolicy=Never \
+  --set gateway.resources.requests.cpu=50m \
+  --set gateway.resources.requests.memory=128Mi \
   --set gateway.openaiUpstream=http://fake-upstream:9000/v1 \
   --set gateway.anthropicUpstream=http://fake-upstream:9000/v1 \
   --set console.image.pullPolicy=Never \
+  --set console.resources.requests.cpu=50m \
+  --set console.resources.requests.memory=128Mi \
   --set enterprise.enabled=true \
   --set enterprise.kms.vaultAddress=http://vault:8200 \
   --set postgres.enabled=true \
   --set postgres.persistence.enabled=false \
+  --set postgres.resources.requests.cpu=50m \
+  --set postgres.resources.requests.memory=128Mi \
   --wait --timeout 5m
 
 kubectl -n "$namespace" rollout status deployment/fake-upstream --timeout=120s
