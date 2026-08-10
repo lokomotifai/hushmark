@@ -75,8 +75,11 @@ jobs:
           cosign verify-attestation --allow-insecure-registry --key cosign.pub \
             --insecure-ignore-tlog --type cyclonedx "$image_ref" \
             > "${{ matrix.name }}.verified-attestation.json"
-          jq -e 'type == "array" and length > 0' \
-            "${{ matrix.name }}.verified-attestation.json" > /dev/null
+          jq -er '.payload' "${{ matrix.name }}.verified-attestation.json" \
+            | base64 --decode > "${{ matrix.name }}.verified-statement.json"
+          jq -e --arg digest "${digest#sha256:}" \
+            '.predicateType == "https://cyclonedx.org/bom" and any(.subject[]; .digest.sha256 == $digest)' \
+            "${{ matrix.name }}.verified-statement.json" > /dev/null
       - name: Enforce vulnerability and corpus budgets
         run: |
           image="localhost:5000/hushmark/${{ matrix.name }}:0.1.0"
@@ -94,3 +97,4 @@ jobs:
             ${{ matrix.name }}.spdx.json
             ${{ matrix.name }}.grype.json
             ${{ matrix.name }}.verified-attestation.json
+            ${{ matrix.name }}.verified-statement.json
