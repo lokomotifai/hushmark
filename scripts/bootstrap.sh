@@ -24,9 +24,8 @@ uv sync --frozen --all-packages
 
 if [[ "${HUSHMARK_FETCH_MODELS:-1}" == "1" ]]; then
   uv run python scripts/fetch-models.py
-  if ! HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 uv run python tools/export-onnx.py --verify-only; then
-    HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 uv run python tools/export-onnx.py
-  fi
+  HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 \
+    uv run python tools/export-onnx.py --verify-only
 fi
 
 echo "Bootstrap complete."

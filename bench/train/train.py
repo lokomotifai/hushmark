@@ -15,12 +15,15 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from hushmark_bench.dataset import load_dataset
 from hushmark_bench.training import (
+    adoption_verdict,
     assert_evaluation_isolation,
     json_lines,
     load_model_labels,
     load_prepared,
     prepare_hushmark_records,
+    prepare_record,
     sha256_file,
     smoke_records,
 )
@@ -28,14 +31,18 @@ from hushmark_bench.training_state import (
     TrainingProgress,
     atomic_write_json,
     checkpoint_name,
+    deterministic_balanced_epoch_indices,
     deterministic_epoch_indices,
+    linear_warmup_decay,
     normalized_progress,
+    optimizer_parameter_groups,
     progress_dict,
     prune_checkpoints,
     resolve_resume_checkpoint,
     run_fingerprint,
     write_latest_checkpoint,
 )
+from hushmark_bench.validation import validate_ner_model, validation_rank
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -75,16 +82,46 @@ def hardware_manifest(torch: Any, device: str) -> dict[str, Any]:
     return hardware
 
 
+def save_development_best(
+    *,
+    model: Any,
+    output: Path,
+    report: dict[str, Any],
+) -> Path:
+    target = output / "development-best"
+    temporary = output / ".development-best.tmp"
+    if temporary.exists():
+        shutil.rmtree(temporary)
+    temporary.mkdir(parents=True)
+    model.save_pretrained(temporary / "model", safe_serialization=False)
+    atomic_write_json(temporary / "validation_report.json", report)
+    if target.exists():
+        shutil.rmtree(target)
+    temporary.replace(target)
+    return target
+
+
+def materialize_development_best(output: Path) -> None:
+    source = output / "development-best/model"
+    if not source.is_dir():
+        raise FileNotFoundError("development-best model is missing")
+    for path in source.iterdir():
+        if path.is_file():
+            shutil.copy2(path, output / path.name)
+
+
 def save_checkpoint(
     *,
     torch: Any,
     model: Any,
     optimizer: Any,
+    scheduler: Any,
     scaler: Any,
     output: Path,
     fingerprint: str,
     progress: TrainingProgress,
     keep: int,
+    validation_state: dict[str, Any] | None,
 ) -> Path:
     checkpoints_dir = output / "checkpoints"
     checkpoints_dir.mkdir(parents=True, exist_ok=True)
@@ -99,11 +136,13 @@ def save_checkpoint(
     model.save_pretrained(temporary / "model", safe_serialization=False)
     state = {
         "optimizer": optimizer.state_dict(),
+        "scheduler": scheduler.state_dict(),
         "scaler": scaler.state_dict(),
         "python_random_state": random.getstate(),
         "torch_random_state": torch.get_rng_state(),
         "cuda_random_state": torch.cuda.get_rng_state_all() if torch.cuda.is_available() else [],
         "progress": progress_dict(progress),
+        "validation_state": validation_state,
     }
     torch.save(state, temporary / "state.pt")
     atomic_write_json(
@@ -136,6 +175,12 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
         raise ValueError("checkpoint cadence and retention must be positive")
     if args.max_steps is not None and args.max_steps < 1:
         raise ValueError("max steps must be positive")
+    if args.validation_every < 1 or args.early_stopping_patience < 1:
+        raise ValueError("validation cadence and early-stopping patience must be positive")
+    if args.warmup_steps < 0:
+        raise ValueError("warmup steps must not be negative")
+    if args.validation_min_delta < 0 or not 0 <= args.validation_threshold <= 1:
+        raise ValueError("validation delta or threshold is invalid")
     device = "cpu" if args.smoke else args.device
     if device == "cuda" and not torch.cuda.is_available():
         raise RuntimeError("CUDA was requested but torch.cuda.is_available() is false")
@@ -150,6 +195,8 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
         torch.backends.cudnn.deterministic = True
 
     labels = load_model_labels(args.registry)
+    validation_examples: list[dict[str, Any]] = []
+    validation_records: list[dict[str, Any]] = []
     if args.smoke:
         records = (
             smoke_records(args.seed, labels) if args.data is None else load_prepared(args.data)
@@ -166,9 +213,18 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
             )
         if args.data is None:
             raise ValueError("full training requires --data")
+        if args.validation_data is None:
+            raise ValueError("full training requires --validation-data")
         records = load_prepared(args.data)
         evaluation_records = prepare_hushmark_records(args.evaluation_data, labels)
+        validation_examples = load_dataset(args.validation_data)
+        validation_records = [
+            prepare_record(example, labels, source="synthetic-dev")
+            for example in validation_examples
+        ]
         assert_evaluation_isolation(records, evaluation_records)
+        assert_evaluation_isolation(records, validation_records)
+        assert_evaluation_isolation(validation_records, evaluation_records)
         epochs = args.epochs
         batch_size = args.batch_size or 16
     if epochs < 1 or batch_size < 1:
@@ -188,6 +244,16 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
         if args.data is not None
         else hashlib.sha256(json_lines(records).encode()).hexdigest()
     )
+    encoder_learning_rate = (
+        args.learning_rate if args.learning_rate is not None else args.encoder_learning_rate
+    )
+    head_learning_rate = (
+        args.learning_rate if args.learning_rate is not None else args.head_learning_rate
+    )
+    expected_steps = math.ceil(len(records) / batch_size) * epochs
+    validation_sha256 = (
+        sha256_file(args.validation_data) if args.validation_data is not None else None
+    )
     config = {
         "schema_version": 1,
         "base_model": "gliner_multi_pii-v1",
@@ -196,7 +262,15 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
         "examples": len(records),
         "epochs": epochs,
         "batch_size": batch_size,
-        "learning_rate": args.learning_rate,
+        "encoder_learning_rate": encoder_learning_rate,
+        "head_learning_rate": head_learning_rate,
+        "train_text_encoder": args.train_text_encoder and not args.smoke,
+        "warmup_steps": args.warmup_steps,
+        "balanced_sampling": args.balanced_sampling,
+        "validation_records_sha256": validation_sha256,
+        "validation_every": args.validation_every,
+        "early_stopping_patience": args.early_stopping_patience,
+        "validation_threshold": args.validation_threshold,
         "seed": args.seed,
         "device": device,
         "amp": amp_mode,
@@ -205,18 +279,28 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
     fingerprint = run_fingerprint(config)
     model_source = resume_checkpoint / "model" if resume_checkpoint else args.model_dir
     model = GLiNER.from_pretrained(str(model_source), local_files_only=True, map_location="cpu")
+    groups, parameters = optimizer_parameter_groups(
+        model,
+        train_text_encoder=args.train_text_encoder and not args.smoke,
+        encoder_learning_rate=encoder_learning_rate,
+        head_learning_rate=head_learning_rate,
+    )
     model.to(device)
-    if args.smoke:
-        model.freeze_component("text_encoder")
     model.train()
     collator = model._create_data_collator()
-    parameters = [parameter for parameter in model.parameters() if parameter.requires_grad]
-    if not parameters:
-        raise RuntimeError("training configuration has no trainable parameters")
-    optimizer = torch.optim.AdamW(parameters, lr=args.learning_rate, weight_decay=0.01)
+    optimizer = torch.optim.AdamW(groups, weight_decay=0.01)
+    scheduler = torch.optim.lr_scheduler.LambdaLR(
+        optimizer,
+        lr_lambda=lambda step: linear_warmup_decay(
+            step,
+            warmup_steps=args.warmup_steps,
+            total_steps=expected_steps,
+        ),
+    )
     scaler = torch.amp.GradScaler("cuda", enabled=amp_mode == "fp16")
     progress = TrainingProgress(0, 0, 0, 0.0, 0, None)
     resumed_from: str | None = None
+    validation_state: dict[str, Any] | None = None
     if resume_checkpoint is not None:
         checkpoint_manifest = json.loads(
             (resume_checkpoint / "checkpoint_manifest.json").read_text(encoding="utf-8")
@@ -226,12 +310,16 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
         state = torch.load(resume_checkpoint / "state.pt", map_location="cpu", weights_only=False)
         optimizer.load_state_dict(state["optimizer"])
         optimizer_to_device(optimizer, device)
+        scheduler.load_state_dict(state["scheduler"])
         scaler.load_state_dict(state["scaler"])
         random.setstate(state["python_random_state"])
         torch.set_rng_state(state["torch_random_state"])
         if device == "cuda" and state["cuda_random_state"]:
             torch.cuda.set_rng_state_all(state["cuda_random_state"])
         progress = TrainingProgress(**state["progress"])
+        validation_state = state.get("validation_state")
+        if validation_examples and not isinstance(validation_state, dict):
+            raise ValueError("resume checkpoint has no compatible validation state")
         resumed_from = str(resume_checkpoint)
         print(
             f"resuming step={progress.global_step} epoch={progress.epoch_index + 1} "
@@ -241,16 +329,102 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
 
     args.output.mkdir(parents=True, exist_ok=True)
     atomic_write_json(args.output / "run_config.json", {**config, "run_fingerprint": fingerprint})
-    expected_steps = math.ceil(len(records) / batch_size) * epochs
+    history_path = args.output / "development-history.jsonl"
+    if validation_examples and validation_state is None:
+        model.eval()
+        with torch.inference_mode():
+            baseline = validate_ner_model(
+                model,
+                validation_examples,
+                labels,
+                threshold=args.validation_threshold,
+            )
+        baseline_verdict = adoption_verdict(baseline, baseline, eligible=True)
+        baseline_report = {
+            "schema_version": 1,
+            "step": 0,
+            "candidate": baseline,
+            "verdict": baseline_verdict,
+        }
+        baseline_rank = validation_rank(baseline_report)
+        save_development_best(model=model, output=args.output, report=baseline_report)
+        history_path.write_text(
+            json.dumps(baseline_report, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        validation_state = {
+            "baseline": baseline,
+            "best_report": baseline_report,
+            "best_rank": list(baseline_rank),
+            "best_step": 0,
+            "validations_without_improvement": 0,
+        }
+        model.train()
+
+    def validate_and_update(step: int) -> bool:
+        nonlocal validation_state
+        if not validation_examples or validation_state is None:
+            return False
+        model.eval()
+        with torch.inference_mode():
+            candidate = validate_ner_model(
+                model,
+                validation_examples,
+                labels,
+                threshold=args.validation_threshold,
+            )
+        model.train()
+        verdict = adoption_verdict(candidate, validation_state["baseline"], eligible=True)
+        report = {
+            "schema_version": 1,
+            "step": step,
+            "candidate": candidate,
+            "verdict": verdict,
+        }
+        with history_path.open("a", encoding="utf-8") as history:
+            history.write(json.dumps(report, sort_keys=True) + "\n")
+        rank = validation_rank(report)
+        best_rank = tuple(float(value) for value in validation_state["best_rank"])
+        pass_transition = rank[0] > best_rank[0]
+        macro_improvement = rank[1] >= best_rank[1] + args.validation_min_delta
+        regression_improvement = rank[1] >= best_rank[1] and rank[2] > best_rank[2]
+        improved = rank > best_rank and (
+            pass_transition or macro_improvement or regression_improvement
+        )
+        if improved:
+            save_development_best(model=model, output=args.output, report=report)
+            validation_state.update(
+                {
+                    "best_report": report,
+                    "best_rank": list(rank),
+                    "best_step": step,
+                    "validations_without_improvement": 0,
+                }
+            )
+        else:
+            validation_state["validations_without_improvement"] += 1
+        print(
+            f"development step={step} macro_f1={candidate['ner_macro_f1']:.6f} "
+            f"technical_pass={str(verdict['technical_pass']).lower()} "
+            f"best_step={validation_state['best_step']}",
+            flush=True,
+        )
+        return validation_state["validations_without_improvement"] >= args.early_stopping_patience
+
     last_checkpoint_step = progress.global_step if resume_checkpoint is not None else 0
     stop_requested = args.max_steps is not None and progress.global_step >= args.max_steps
+    stop_reason = "max-steps" if stop_requested else None
 
     try:
         for epoch_index in range(progress.epoch_index, epochs):
             if stop_requested:
                 break
             offset = progress.next_sample_offset if epoch_index == progress.epoch_index else 0
-            indices = deterministic_epoch_indices(len(records), args.seed, epoch_index)
+            indices = (
+                deterministic_balanced_epoch_indices(records, args.seed, epoch_index)
+                if args.balanced_sampling and not args.smoke
+                else deterministic_epoch_indices(len(records), args.seed, epoch_index)
+            )
             remaining = Subset(records, indices[offset:])
             loader = DataLoader(
                 remaining,
@@ -283,6 +457,7 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
                     output.loss.backward()
                     torch.nn.utils.clip_grad_norm_(parameters, 1.0)
                     optimizer.step()
+                scheduler.step()
 
                 loss = float(output.loss.detach())
                 next_offset = min(len(records), offset + batch_size)
@@ -301,20 +476,35 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
                     f"epoch={epoch_index + 1}/{epochs} loss={loss:.6f}",
                     flush=True,
                 )
-                stop_requested = (
+                max_steps_reached = (
                     args.max_steps is not None and progress.global_step >= args.max_steps
                 )
-                should_checkpoint = progress.global_step % args.checkpoint_every == 0
+                validation_due = (
+                    bool(validation_examples) and progress.global_step % args.validation_every == 0
+                )
+                early_stopping_reached = (
+                    validate_and_update(progress.global_step) if validation_due else False
+                )
+                if max_steps_reached:
+                    stop_reason = "max-steps"
+                elif early_stopping_reached:
+                    stop_reason = "early-stopping"
+                stop_requested = max_steps_reached or early_stopping_reached
+                should_checkpoint = (
+                    progress.global_step % args.checkpoint_every == 0 or validation_due
+                )
                 if should_checkpoint or stop_requested:
                     save_checkpoint(
                         torch=torch,
                         model=model,
                         optimizer=optimizer,
+                        scheduler=scheduler,
                         scaler=scaler,
                         output=args.output,
                         fingerprint=fingerprint,
                         progress=progress,
                         keep=args.keep_checkpoints,
+                        validation_state=validation_state,
                     )
                     last_checkpoint_step = progress.global_step
                 if stop_requested:
@@ -325,48 +515,68 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
                 torch=torch,
                 model=model,
                 optimizer=optimizer,
+                scheduler=scheduler,
                 scaler=scaler,
                 output=args.output,
                 fingerprint=fingerprint,
                 progress=progress,
                 keep=args.keep_checkpoints,
+                validation_state=validation_state,
             )
         raise
 
     if progress.loss_count == 0 or progress.final_loss is None:
         raise RuntimeError("training completed no optimizer steps")
-    complete = progress.epoch_index >= epochs
-    model.eval()
-    model.save_pretrained(args.output, safe_serialization=False)
+    if validation_examples and progress.global_step % args.validation_every:
+        validate_and_update(progress.global_step)
+    if stop_reason is None and progress.epoch_index >= epochs:
+        stop_reason = "epochs-complete"
+    complete = args.max_steps is None and stop_reason in {"epochs-complete", "early-stopping"}
+    development_gate_pass = bool(
+        validation_state and validation_state["best_report"]["verdict"]["technical_pass"]
+    )
+    if validation_examples:
+        materialize_development_best(args.output)
+    else:
+        model.eval()
+        model.save_pretrained(args.output, safe_serialization=False)
     elapsed = time.perf_counter() - started
     weights = args.output / "pytorch_model.bin"
     run_kind = "smoke" if args.smoke else ("full" if complete else "pilot")
     manifest = {
-        "schema_version": 2,
+        "schema_version": 3,
         "model_id": "hushmark-tr-smoke" if args.smoke else "hushmark-tr",
         "base_model": "gliner_multi_pii-v1",
         "run_kind": run_kind,
         "smoke": args.smoke,
         "complete": complete,
-        "adoption_eligible": not args.smoke and complete,
+        "adoption_eligible": not args.smoke and complete and development_gate_pass,
         "examples": len(records),
         "epochs": epochs,
         "batch_size": batch_size,
         "optimizer_steps": progress.global_step,
         "expected_optimizer_steps": expected_steps,
         "max_steps": args.max_steps,
+        "stop_reason": stop_reason,
         "checkpoint_every": args.checkpoint_every,
         "kept_checkpoints": args.keep_checkpoints,
         "resumed_from": resumed_from,
         "seed": args.seed,
         "amp": amp_mode,
-        "frozen_components": ["text_encoder"] if args.smoke else [],
-        "learning_rate": args.learning_rate,
+        "frozen_components": [] if args.train_text_encoder and not args.smoke else ["text_encoder"],
+        "encoder_learning_rate": encoder_learning_rate,
+        "head_learning_rate": head_learning_rate,
+        "warmup_steps": args.warmup_steps,
+        "balanced_sampling": args.balanced_sampling,
         "mean_loss": progress.loss_sum / progress.loss_count,
         "final_loss": progress.final_loss,
         "elapsed_seconds": elapsed,
         "weights_sha256": sha256_file(weights),
         "training_records_sha256": records_sha256,
+        "validation_records_sha256": validation_sha256,
+        "development_gate_pass": development_gate_pass,
+        "development_best_step": validation_state["best_step"] if validation_state else None,
+        "development_best_report": (validation_state["best_report"] if validation_state else None),
         "training_sources": sorted({str(record.get("source", "unknown")) for record in records}),
         "run_fingerprint": fingerprint,
         "hardware": hardware_manifest(torch, device),
@@ -383,6 +593,7 @@ def main() -> int:
     parser.add_argument("--smoke", action="store_true")
     parser.add_argument("--authorized-full-run", action="store_true")
     parser.add_argument("--data", type=Path)
+    parser.add_argument("--validation-data", type=Path)
     parser.add_argument("--model-dir", type=Path, default=ROOT / "models/gliner_multi_pii-v1")
     parser.add_argument("--registry", type=Path, default=ROOT / "core/models.yaml")
     parser.add_argument(
@@ -393,11 +604,28 @@ def main() -> int:
     parser.add_argument("--seed", type=int, default=20260809)
     parser.add_argument("--epochs", type=int, default=3)
     parser.add_argument("--batch-size", type=int)
-    parser.add_argument("--learning-rate", type=float, default=1e-4)
+    parser.add_argument(
+        "--learning-rate",
+        type=float,
+        help="legacy override that applies one rate to both encoder and head",
+    )
+    parser.add_argument("--encoder-learning-rate", type=float, default=5e-6)
+    parser.add_argument("--head-learning-rate", type=float, default=1e-5)
+    parser.add_argument("--train-text-encoder", action="store_true")
+    parser.add_argument("--warmup-steps", type=int, default=50)
+    parser.add_argument("--validation-every", type=int, default=100)
+    parser.add_argument("--early-stopping-patience", type=int, default=5)
+    parser.add_argument("--validation-min-delta", type=float, default=0.002)
+    parser.add_argument("--validation-threshold", type=float, default=0.55)
+    parser.add_argument(
+        "--balanced-sampling",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+    )
     parser.add_argument("--device", choices=("cpu", "cuda", "mps"), default="cuda")
     parser.add_argument("--amp", choices=("auto", "off", "bf16", "fp16"), default="auto")
     parser.add_argument("--max-steps", type=int, help="bounded pilot; never adoption-eligible")
-    parser.add_argument("--checkpoint-every", type=int, default=1000)
+    parser.add_argument("--checkpoint-every", type=int, default=100)
     parser.add_argument("--keep-checkpoints", type=int, default=2)
     args = parser.parse_args()
     if not args.smoke and not args.authorized_full_run:

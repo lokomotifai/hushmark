@@ -24,6 +24,8 @@ BALANCE_UNIT = len(TEMPLATES) * len(MORPHOLOGIES)
 DEFAULT_SYNTHETIC_EXAMPLES = math.ceil(200_000 / BALANCE_UNIT) * BALANCE_UNIT
 LOCKED_BENCHMARK_REPETITIONS = 8
 LOCKED_BENCHMARK_EXAMPLES = len(TEMPLATES) * LOCKED_BENCHMARK_REPETITIONS
+DEVELOPMENT_REPETITIONS = 4
+DEVELOPMENT_EXAMPLES = len(TEMPLATES) * DEVELOPMENT_REPETITIONS
 NER_TYPES = tuple(
     entity_type for entity_type, metadata in TAXONOMY.items() if metadata["layer"] == "ner"
 )
@@ -56,6 +58,7 @@ AI4PRIVACY_TYPE_ALIASES = {
 class SynthesisSummary:
     examples: int
     excluded_locked_examples: int
+    excluded_development_examples: int
     sha256: str
     domains: dict[str, int]
     morphologies: dict[str, int]
@@ -71,16 +74,29 @@ def scaled_examples(seed: int, count: int = DEFAULT_SYNTHETIC_EXAMPLES) -> Itera
 
 
 def full_training_examples(seed: int, count: int = DEFAULT_SYNTHETIC_EXAMPLES) -> Iterator[Example]:
-    """Yield a balanced corpus strictly after the locked v0 evaluation rows."""
+    """Yield a balanced corpus strictly after the locked v0 and development rows."""
 
     if count < 200_000 or count % BALANCE_UNIT:
         raise ValueError(f"example count must be >=200000 and divisible by {BALANCE_UNIT}")
-    repetitions = LOCKED_BENCHMARK_REPETITIONS + count // len(TEMPLATES)
-    generated = generate_examples(seed, repetitions=repetitions)
+    repetitions = LOCKED_BENCHMARK_REPETITIONS + DEVELOPMENT_REPETITIONS + count // len(TEMPLATES)
+    generated = generate_examples(seed, repetitions=repetitions, unique_other_ibans=True)
+    first_training_example = LOCKED_BENCHMARK_EXAMPLES + DEVELOPMENT_EXAMPLES
+    yield from islice(
+        generated,
+        first_training_example,
+        first_training_example + count,
+    )
+
+
+def development_examples(seed: int) -> Iterator[Example]:
+    """Yield the deterministic development range reserved between benchmark and training."""
+
+    repetitions = LOCKED_BENCHMARK_REPETITIONS + DEVELOPMENT_REPETITIONS
+    generated = generate_examples(seed, repetitions=repetitions, unique_other_ibans=True)
     yield from islice(
         generated,
         LOCKED_BENCHMARK_EXAMPLES,
-        LOCKED_BENCHMARK_EXAMPLES + count,
+        LOCKED_BENCHMARK_EXAMPLES + DEVELOPMENT_EXAMPLES,
     )
 
 
@@ -127,6 +143,7 @@ def synthesize(
     return SynthesisSummary(
         examples=count,
         excluded_locked_examples=LOCKED_BENCHMARK_EXAMPLES if exclude_locked else 0,
+        excluded_development_examples=DEVELOPMENT_EXAMPLES if exclude_locked else 0,
         sha256=digest.hexdigest(),
         domains=dict(sorted(domains.items())),
         morphologies=dict(sorted(morphologies.items())),
@@ -215,11 +232,16 @@ def prepare_hushmark_records(data_path: Path, labels: Mapping[str, str]) -> list
 def smoke_records(seed: int, labels: Mapping[str, str]) -> list[dict[str, Any]]:
     """Build 200 deterministic smoke rows that do not overlap the locked v0 benchmark."""
 
-    # v0 uses the first eight repetitions. Start at repetition nine so smoke training
-    # never sees an exact benchmark row while retaining deterministic Turkish coverage.
-    generated = list(generate_examples(seed, repetitions=9))[
-        LOCKED_BENCHMARK_EXAMPLES : LOCKED_BENCHMARK_EXAMPLES + 200
-    ]
+    # v0 uses the first eight repetitions and development uses the next four. Start
+    # after both reserved ranges so smoke training cannot tune either evaluation set.
+    first_smoke_example = LOCKED_BENCHMARK_EXAMPLES + DEVELOPMENT_EXAMPLES
+    generated = list(
+        generate_examples(
+            seed,
+            repetitions=LOCKED_BENCHMARK_REPETITIONS + DEVELOPMENT_REPETITIONS + 1,
+            unique_other_ibans=True,
+        )
+    )[first_smoke_example : first_smoke_example + 200]
     return [
         prepare_record(asdict(example), labels, source="synthetic-post-benchmark-holdout")
         for example in generated
@@ -272,7 +294,7 @@ def prepare_jsonl(
     *,
     input_path: Path,
     output_path: Path,
-    source_format: Literal["hushmark", "synthetic-full", "ai4privacy"],
+    source_format: Literal["hushmark", "synthetic-full", "synthetic-dev", "ai4privacy"],
     labels: Mapping[str, str],
     limit: int | None = None,
 ) -> tuple[int, str]:

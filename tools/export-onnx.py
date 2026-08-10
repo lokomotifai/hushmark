@@ -15,8 +15,8 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model-id", default="gliner_multi_pii-v1")
-    parser.add_argument("--output", default="model_quantized.onnx")
+    parser.add_argument("--model-id", default="hushmark-tr")
+    parser.add_argument("--output", default="model.onnx")
     parser.add_argument("--verify-only", action="store_true")
     args = parser.parse_args()
     model_dir = ROOT / "models" / args.model_id
@@ -28,6 +28,11 @@ def main() -> int:
         verify_export(output, spec.onnx_size, spec.onnx_sha256)
         print(output)
         return 0
+    if spec.distribution == "local-artifact":
+        raise RuntimeError(
+            "local-artifact ONNX exports must be produced and calibrated by the guarded "
+            "training pipeline; use --verify-only for the pinned production graph"
+        )
     model = GLiNER.from_pretrained(str(model_dir), local_files_only=True, map_location="cpu")
     exporter = getattr(model, "export_to_onnx", None)
     if not callable(exporter):

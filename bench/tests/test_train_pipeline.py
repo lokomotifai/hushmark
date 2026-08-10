@@ -7,9 +7,11 @@ from typing import Any
 
 import pytest
 from hushmark_bench.training import (
+    DEVELOPMENT_EXAMPLES,
     NER_TYPES,
     adoption_verdict,
     assert_evaluation_isolation,
+    development_examples,
     full_training_examples,
     load_model_labels,
     normalize_ai4privacy_record,
@@ -54,10 +56,27 @@ def test_full_synthesis_excludes_locked_benchmark_and_remains_balanced() -> None
     }
     assert first == second
     assert first.excluded_locked_examples == 2016
+    assert first.excluded_development_examples == DEVELOPMENT_EXAMPLES
     assert len(examples) == 200_592
     assert not ({example.id for example in examples} & benchmark_ids)
     assert len(set(first.domains.values())) == 1
     assert len(set(first.domain_morphologies.values())) == 1
+    labels = load_model_labels(ROOT / "core/models.yaml")
+    evaluation = prepare_hushmark_records(ROOT / "bench/data/hushmark-bench-v0.jsonl", labels)
+    development = [
+        prepare_record(asdict(example), labels, source="synthetic-dev")
+        for example in development_examples(20260809)
+    ]
+    assert len(development) == DEVELOPMENT_EXAMPLES
+    assert_evaluation_isolation(development, evaluation)
+    assert_evaluation_isolation(
+        (prepare_record(asdict(example), labels, source="synthetic-full") for example in examples),
+        evaluation,
+    )
+    assert_evaluation_isolation(
+        (prepare_record(asdict(example), labels, source="synthetic-full") for example in examples),
+        development,
+    )
 
 
 def test_smoke_records_do_not_overlap_locked_benchmark() -> None:
@@ -72,6 +91,8 @@ def test_smoke_records_do_not_overlap_locked_benchmark() -> None:
     assert len(records) == 200
     assert {record["source"] for record in records} == {"synthetic-post-benchmark-holdout"}
     assert not ({record["id"] for record in records} & benchmark_ids)
+    development_ids = {example.id for example in development_examples(20260809)}
+    assert not ({record["id"] for record in records} & development_ids)
 
 
 def test_prepare_record_preserves_turkish_token_span() -> None:

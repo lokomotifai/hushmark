@@ -12,6 +12,8 @@ def test_defaults_select_the_offline_torch_backend(monkeypatch: object) -> None:
     assert settings.port == 8000
     assert settings.ner_backend == "torch"
     assert settings.ner_threshold == 0.55
+    assert settings.model_id == "hushmark-tr"
+    assert settings.onnx_model_file == "model.onnx"
 
 
 def test_legacy_backend_environment_alias(monkeypatch: pytest.MonkeyPatch) -> None:

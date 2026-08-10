@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 from hushmark_bench.training_state import (
     atomic_write_json,
+    deterministic_balanced_epoch_indices,
     deterministic_epoch_indices,
     normalized_progress,
     prune_checkpoints,
@@ -20,6 +21,21 @@ def test_epoch_permutation_is_deterministic_and_epoch_specific() -> None:
     assert first == deterministic_epoch_indices(100, 20260809, 0)
     assert first != deterministic_epoch_indices(100, 20260809, 1)
     assert sorted(first) == list(range(100))
+
+
+def test_balanced_epoch_sampling_is_deterministic_and_favors_rare_labels() -> None:
+    records = [
+        *({"ner": [[0, 0, "common"]]} for _ in range(80)),
+        *({"ner": [[0, 0, "rare"]]} for _ in range(10)),
+        *({"ner": []} for _ in range(10)),
+    ]
+    first = deterministic_balanced_epoch_indices(records, 20260809, 0)
+    assert first == deterministic_balanced_epoch_indices(records, 20260809, 0)
+    assert first != deterministic_balanced_epoch_indices(records, 20260809, 1)
+    rare = sum(index >= 80 and index < 90 for index in first)
+    empty = sum(index >= 90 for index in first)
+    assert rare > 10
+    assert empty < 10
 
 
 def test_progress_normalizes_end_of_epoch() -> None:

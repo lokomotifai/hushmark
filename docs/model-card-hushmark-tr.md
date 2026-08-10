@@ -2,10 +2,10 @@
 
 ## Status
 
-`hushmark-tr` is a reproducible candidate pipeline, not the v0.1 production model. The production
-runtime continues to use the pinned `urchade/gliner_multi_pii-v1` incumbent until a full checkpoint
-passes the machine-readable adoption rule. The paid/GPU run remains unperformed; its isolated
-RunPod execution package and runbook are ready for the authorized AC-1 operation.
+`hushmark-tr` is the locally adopted v0.1 production NER model. The guarded AC-1 retry on
+2026-08-10 passed the isolated development gate, the locked adoption gate, and FP32 ONNX parity.
+It replaces `urchade/gliner_multi_pii-v1` as the local runtime default. The model and release
+artifacts have not been uploaded or published; external distribution remains behind AC-2.
 
 ## Intended use
 
@@ -15,61 +15,96 @@ biometric reference, and union membership. Deterministic identifiers and secrets
 the L0 validators. Policy, masking, blocking, and audit decisions are outside the model.
 
 This model is a detection aid and not an anonymization or legal-compliance guarantee. False
-negatives and false positives are expected; operators must validate policy and benchmark evidence
-for their own data.
+negatives and false positives remain possible; operators must validate it on their own data.
+
+## Architecture and context
+
+The checkpoint fine-tunes the GLiNER `gliner_multi_pii-v1` architecture and its pinned
+mDeBERTa-v3-base encoder. The training and runtime configuration limits inputs to 384 tokens and
+spans to 12 tokens. Production uses the verified FP32 ONNX graph; the retained Torch checkpoint is
+the reproducibility and reference path.
 
 ## Data provenance
 
-- Locked evaluation source: seeded synthetic `hushmark-bench-v0`, whose lock digest is committed
-  and whose 2,016 rows are forbidden from training.
-- Scaled training source: 200,592 deterministic examples generated strictly after the locked
-  range, balanced across six domains, four morphology modes, and every domain/morphology
-  intersection.
-- Optional source: an approved Turkish AI4Privacy export. Network access, dataset terms, exact
-  revision, source digest, and scale remain pending and must be recorded before a full run.
-- No private strategy corpus or customer data is a training source.
+- Locked evaluation: seeded synthetic `hushmark-bench-v0`, 2,016 rows, SHA-256
+  `6170b620faa349dbcbf2f2a973d5de20e35c6594e5626a2a589d20df5f67d642`. It was evaluated once,
+  after candidate selection, and was never used for training or threshold selection.
+- Isolated development set: 1,008 synthetic rows immediately after the locked repetition range.
+  Raw SHA-256 `2525360ff36e613a967389b1ff7f8522f5861c2b43fc044387e7a8dc71c08a5e`;
+  prepared SHA-256 `8da126adf23c9ea54e4fc09eb62a9c7ce8897f753d5c1724f2bb862370c11880`.
+- Full training set: 200,592 deterministic, balanced synthetic examples generated after both the
+  locked and development ranges. Raw SHA-256
+  `4e622b794b670b32b8dd274ccfb2164b13ea73f93c2d01aba382b25f60066e9d`;
+  prepared SHA-256 `849256b4c1cfb6b243c377e97abeafe65372ffe69fe868d4c5c0f232acce8a43`.
+- No private strategy corpus, customer data, LLM synthesis, or external dataset was used.
+
+The sources share a synthetic template family, but row IDs, source labels, and model-visible
+content are disjoint. This prevents direct leakage; it does not make the benchmark representative
+of real customer language.
 
 ## Training configuration
 
-The base model and tokenizer are resolved from the offline pinned registry. Smoke mode uses 200
-seeded examples drawn after the eight repetitions reserved for the locked benchmark, one CPU
-epoch, and a frozen transformer encoder; it updates the remaining GLiNER NER layers and writes
-weights plus a manifest. Full mode rejects records with the evaluation source, an evaluation ID,
-or identical model-visible content. CUDA mode supports automatic BF16/FP16, bounded ineligible
-pilots, atomic checkpoints, two-checkpoint retention, and compatible-run resume. The planned
-single-A100 configuration is documented in `docs/train-runpod.md`; actual hardware, time, dataset
-hashes, loss, and output digest remain pending the external AC-1 run.
+The successful retry used one NVIDIA A100-SXM4-80GB, BF16, batch size 16, seed 20260809, a frozen
+encoder, head learning rate `1e-5`, 50 warm-up steps, linear decay, balanced sampling, validation
+every 100 steps, minimum development improvement 0.002, and patience 5. Training started from the
+pinned base model, selected the atomic best checkpoint at step 1,500, and stopped cleanly at step
+2,000 after 930.497 seconds. Peak allocated GPU memory was 1,526,949,888 bytes.
+
+The selected Torch weight is 1,155,879,495 bytes with SHA-256
+`a8f8bc87fdd4d4a92898513fd87eed9e7ccd2b6603ef1d1d5ce152e49192b6c2`. Its run fingerprint is
+`edf3666702a036f6b9906da451361c771082b89c9febb2bc3306e352d614bf1d`.
+
+An earlier three-epoch AC-1 attempt used a substantially larger learning rate and no development
+selection. It collapsed to zero accepted NER spans on the locked benchmark and was rejected. That
+failure remains in the evidence history; its checkpoint was not promoted.
 
 ## Evaluation and adoption
 
-Evaluation uses strict type plus Unicode code-point offsets on the locked 2,016-example
-`hushmark-bench-v0`. Only a full, complete evaluation is eligible. Adoption requires both:
+Adoption requires a complete development-selected full run, at least +0.05 absolute NER macro
+strict-F1 over the incumbent, and no per-type regression greater than 0.02.
 
-1. NER macro strict-F1 improves by at least 0.05 absolute over the incumbent.
-2. No NER entity type regresses by more than 0.02 strict-F1.
+The retry's development macro strict-F1 improved from 0.638278 at step 0 to 0.994642 at the
+selected checkpoint with no per-type regression. The once-only locked verdict then reported:
 
-Smoke checkpoints are expected to produce `adopt=false`; their purpose is to prove that data,
-training, checkpoint loading, inference, benchmark evaluation, and verdict generation connect.
+- candidate NER macro strict-F1: `0.9941238343`
+- incumbent NER macro strict-F1: `0.0796138809`
+- absolute improvement: `+0.9145099534`
+- per-type regressions over 0.02: none
+- machine verdict: `adopt=true`, `eligible=true`, `technical_pass=true`
 
-### Recorded CPU smoke result — 2026-08-10
+The weakest locked NER type scores were `SEXUAL_LIFE=0.973262`, `ORG=0.981723`,
+`PERSON=0.984954`, and `ADDRESS=0.989547`; the remaining NER types scored 1.0 on this synthetic
+benchmark.
 
-The local ARM64 CPU run trained 200 non-overlapping synthetic holdout rows for one epoch in
-28.984 seconds. The saved checkpoint reloaded with its manifest SHA-256 and evaluated all 2,016
-locked examples in 230.395 seconds. It measured NER macro strict-F1 0.8126 versus the incumbent's
-0.0796 and no per-type regression over 0.02, so the technical threshold calculation passed. The
-machine verdict remained `adopt=false` and `eligible=false` because smoke artifacts can never be
-adopted. The large gain is template-adjacent synthetic evidence, not proof of real-world
-generalization; it does not change the production model.
+## ONNX deployment evidence
+
+The supported GLiNER export API produced an opset-19 FP32 graph, 1,157,113,250 bytes, SHA-256
+`c5e72ca974f2e671325314f5a2d1d7eb2e1951ccd3d5250b0e223787f22c35ed`. Development-only
+calibration selected an effective ONNX threshold of 0.4. On all 1,008 development rows, FP32 ONNX
+macro strict-F1 was `0.993782469`, only `-0.000859107` from Torch; the sole per-type decline was
+`POLITICAL=-0.0103093`, within the 0.02 limit.
+
+Dynamic INT8 quantization was explicitly rejected: its best development macro strict-F1 was only
+`0.413555` even after threshold calibration. `model_quantized.onnx` is evidence only and is not
+shipped in the active model directory or production image.
+
+On the local Apple ARM64 verification host, one warmed semantic sentence that forced NER measured
+44.74 ms median and 45.41 ms maximum across five FP32 ONNX predictions. This is a functional
+capacity tripwire for that host, not a cross-platform throughput guarantee.
 
 ## Limitations
 
-The required benchmark is synthetic and does not represent every Turkish dialect, spelling,
-OCR error, code-switching pattern, or organizational document. Rare special-category entities have
-limited lexical diversity. GLiNER truncates long inputs according to its configured maximum length.
-Human-curated and customer-specific evaluation remains separate future evidence.
+The benchmark is synthetic and template-adjacent to training. It does not cover every Turkish
+dialect, spelling error, OCR artifact, code-switching pattern, or organization-specific document.
+Rare special-category entities have limited lexical diversity. Inputs beyond the configured
+384-token context are truncated by the model. FP32 ONNX is materially larger and slower than INT8;
+the deterministic residual short circuit avoids invoking it for inputs fully handled by L0, but
+capacity must still be validated on representative unknown residuals. Human-curated and
+customer-specific evaluation remains required future evidence.
 
 ## License and release
 
-The incumbent GLiNER model is Apache-2.0 and the pinned mDeBERTa tokenizer/model is MIT. A final
-`hushmark-tr` release requires provenance review for every added dataset and a completed model-card
-license section. No model weights are published or externally uploaded without AC-2 authorization.
+The upstream GLiNER model is Apache-2.0 and the pinned mDeBERTa base is MIT. The locally retained
+model is derived only from those components and Hushmark-generated synthetic data. Exact artifact
+hashes are pinned in `core/models.yaml`. No model weight, image, package, or registry artifact was
+published externally during AC-1.

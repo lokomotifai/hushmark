@@ -52,8 +52,9 @@ def check_dockerfiles() -> None:
     assert "uv sync --frozen" in core
     assert "FROM runtime AS model" in core and "FROM runtime AS slim" in core
     airgap_core = (DOCKER_DIR / "core-airgap.Dockerfile").read_text(encoding="utf-8")
-    assert "model_quantized.onnx" in airgap_core
-    assert "pytorch_model.bin" not in airgap_core and "model.onnx" not in airgap_core
+    assert "model.onnx" in airgap_core
+    assert "pytorch_model.bin" not in airgap_core
+    assert "model_quantized.onnx" not in airgap_core
     console = (DOCKER_DIR / "console.Dockerfile").read_text(encoding="utf-8")
     assert ".next/standalone" in console
 

@@ -1,4 +1,45 @@
 models:
+  - id: hushmark-tr
+    source: local/ac1-guarded-retry
+    revision: a8f8bc87fdd4d4a92898513fd87eed9e7ccd2b6603ef1d1d5ce152e49192b6c2
+    license: Apache-2.0
+    distribution: local-artifact
+    files:
+      - path: gliner_config.source.json
+        size: 2312
+        sha256: 61a066493aa5b64280be2af4686337553e9f7119f5c77f52e301e8b0ce5c2577
+      - path: pytorch_model.bin
+        size: 1155879495
+        sha256: a8f8bc87fdd4d4a92898513fd87eed9e7ccd2b6603ef1d1d5ce152e49192b6c2
+      - path: tokenizer.json
+        size: 16034824
+        sha256: c5b8041501fcdee792b9b112dd592861f04391a24633a73fd9f05aaaf6e8eff1
+      - path: tokenizer_config.json
+        size: 3031
+        sha256: 956b6974aa26891eba87a28b3f92fa7228804ad6b7a7e2a7ff0473dfb424d886
+    runtime_config:
+      source: gliner_config.source.json
+      target: gliner_config.json
+      tokenizer_model: hushmark-tr
+    onnx_confidence_scale: 0.7272727272727273
+    onnx_export:
+      file: model.onnx
+      size: 1157113250
+      sha256: c5e72ca974f2e671325314f5a2d1d7eb2e1951ccd3d5250b0e223787f22c35ed
+      opset: 19
+    labels:
+      PERSON: person
+      ADDRESS: full address
+      ORG: organization
+      DOB: date of birth
+      HEALTH: medical condition
+      RELIGION: religious belief
+      ETHNICITY: ethnic origin
+      POLITICAL: political opinion
+      SEXUAL_LIFE: sexual orientation
+      CRIMINAL: criminal record
+      BIOMETRIC_REF: biometric data
+      UNION: trade union membership
   - id: gliner_multi_pii-v1
     source: urchade/gliner_multi_pii-v1
     revision: 1fcf13e85f4eef5394e1fcd406cf2ca9ea82351d
