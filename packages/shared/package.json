@@ -1,11 +1,30 @@
 {
   "name": "@hushmark/shared",
   "version": "0.1.0",
-  "private": true,
+  "description": "Shared public schemas and taxonomy types for Hushmark integrations",
   "type": "module",
   "license": "Apache-2.0",
+  "sideEffects": false,
   "engines": {
     "node": "22.x"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hushmark/hushmark-open-core.git",
+    "directory": "packages/shared"
+  },
+  "homepage": "https://github.com/hushmark/hushmark-open-core#readme",
+  "bugs": {
+    "url": "https://github.com/hushmark/hushmark-open-core/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
   },
   "exports": {
     ".": {

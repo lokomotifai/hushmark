@@ -4,6 +4,7 @@
   "description": "Typed TypeScript client for a self-hosted Hushmark gateway",
   "type": "module",
   "license": "Apache-2.0",
+  "sideEffects": false,
   "engines": {
     "node": "22.x"
   },
@@ -12,6 +13,19 @@
     "README.md",
     "LICENSE"
   ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hushmark/hushmark-open-core.git",
+    "directory": "packages/sdk-ts"
+  },
+  "homepage": "https://github.com/hushmark/hushmark-open-core/tree/main/packages/sdk-ts#readme",
+  "bugs": {
+    "url": "https://github.com/hushmark/hushmark-open-core/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
