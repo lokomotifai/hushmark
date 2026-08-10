@@ -9,6 +9,7 @@ import re
 from collections import Counter
 from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import asdict, dataclass
+from itertools import islice
 from pathlib import Path
 from typing import Any, Literal
 
@@ -21,11 +22,14 @@ from hushmark_bench.templates import DOMAINS, TEMPLATES
 TOKEN_PATTERN = re.compile(r"\w+(?:[-_]\w+)*|\S", re.UNICODE)
 BALANCE_UNIT = len(TEMPLATES) * len(MORPHOLOGIES)
 DEFAULT_SYNTHETIC_EXAMPLES = math.ceil(200_000 / BALANCE_UNIT) * BALANCE_UNIT
+LOCKED_BENCHMARK_REPETITIONS = 8
+LOCKED_BENCHMARK_EXAMPLES = len(TEMPLATES) * LOCKED_BENCHMARK_REPETITIONS
 NER_TYPES = tuple(
     entity_type for entity_type, metadata in TAXONOMY.items() if metadata["layer"] == "ner"
 )
 AI4PRIVACY_TYPE_ALIASES = {
     "ADDRESS": "ADDRESS",
+    "BUILDINGNUM": "ADDRESS",
     "BUILDINGNUMBER": "ADDRESS",
     "CITY": "ADDRESS",
     "COMPANYNAME": "ORG",
@@ -34,19 +38,24 @@ AI4PRIVACY_TYPE_ALIASES = {
     "DOB": "DOB",
     "ETHNICITY": "ETHNICITY",
     "FIRSTNAME": "PERSON",
+    "GIVENNAME": "PERSON",
     "HEALTHCONDITION": "HEALTH",
     "LASTNAME": "PERSON",
     "MEDICALCONDITION": "HEALTH",
     "NAME": "PERSON",
     "ORGANIZATION": "ORG",
     "PERSON": "PERSON",
+    "STATE": "ADDRESS",
     "STREET": "ADDRESS",
+    "SURNAME": "PERSON",
+    "ZIPCODE": "ADDRESS",
 }
 
 
 @dataclass(frozen=True, slots=True)
 class SynthesisSummary:
     examples: int
+    excluded_locked_examples: int
     sha256: str
     domains: dict[str, int]
     morphologies: dict[str, int]
@@ -61,11 +70,26 @@ def scaled_examples(seed: int, count: int = DEFAULT_SYNTHETIC_EXAMPLES) -> Itera
     yield from generate_examples(seed, repetitions=count // len(TEMPLATES))
 
 
+def full_training_examples(seed: int, count: int = DEFAULT_SYNTHETIC_EXAMPLES) -> Iterator[Example]:
+    """Yield a balanced corpus strictly after the locked v0 evaluation rows."""
+
+    if count < 200_000 or count % BALANCE_UNIT:
+        raise ValueError(f"example count must be >=200000 and divisible by {BALANCE_UNIT}")
+    repetitions = LOCKED_BENCHMARK_REPETITIONS + count // len(TEMPLATES)
+    generated = generate_examples(seed, repetitions=repetitions)
+    yield from islice(
+        generated,
+        LOCKED_BENCHMARK_EXAMPLES,
+        LOCKED_BENCHMARK_EXAMPLES + count,
+    )
+
+
 def synthesize(
     *,
     seed: int,
     count: int = DEFAULT_SYNTHETIC_EXAMPLES,
     output_path: Path | None = None,
+    exclude_locked: bool = False,
 ) -> SynthesisSummary:
     """Generate canonical JSONL, optionally writing it, and return balance evidence."""
 
@@ -75,7 +99,10 @@ def synthesize(
     domain_morphologies: Counter[str] = Counter()
     output = output_path.open("w", encoding="utf-8") if output_path is not None else None
     try:
-        for example in scaled_examples(seed, count):
+        examples = (
+            full_training_examples(seed, count) if exclude_locked else scaled_examples(seed, count)
+        )
+        for example in examples:
             line = json.dumps(asdict(example), ensure_ascii=False, separators=(",", ":")) + "\n"
             digest.update(line.encode())
             if output is not None:
@@ -99,6 +126,7 @@ def synthesize(
         raise RuntimeError("synthetic domain/morphology intersections are not balanced")
     return SynthesisSummary(
         examples=count,
+        excluded_locked_examples=LOCKED_BENCHMARK_EXAMPLES if exclude_locked else 0,
         sha256=digest.hexdigest(),
         domains=dict(sorted(domains.items())),
         morphologies=dict(sorted(morphologies.items())),
@@ -189,7 +217,9 @@ def smoke_records(seed: int, labels: Mapping[str, str]) -> list[dict[str, Any]]:
 
     # v0 uses the first eight repetitions. Start at repetition nine so smoke training
     # never sees an exact benchmark row while retaining deterministic Turkish coverage.
-    generated = list(generate_examples(seed, repetitions=9))[2016:2216]
+    generated = list(generate_examples(seed, repetitions=9))[
+        LOCKED_BENCHMARK_EXAMPLES : LOCKED_BENCHMARK_EXAMPLES + 200
+    ]
     return [
         prepare_record(asdict(example), labels, source="synthetic-post-benchmark-holdout")
         for example in generated
@@ -200,12 +230,14 @@ def normalize_ai4privacy_record(raw: Mapping[str, Any]) -> dict[str, Any] | None
     """Normalize an exported Turkish AI4Privacy JSONL row with character spans."""
 
     language = raw.get("language", raw.get("lang", raw.get("locale")))
-    if isinstance(language, str) and not language.lower().startswith("tr"):
-        return None
+    if isinstance(language, str):
+        normalized_language = re.sub(r"[^a-z]", "", language.lower())
+        if not (normalized_language.startswith("tr") or normalized_language == "turkish"):
+            return None
     text = raw.get("text", raw.get("source_text"))
-    spans = raw.get("entities", raw.get("spans"))
+    spans = raw.get("entities", raw.get("spans", raw.get("privacy_mask")))
     if not isinstance(text, str) or not isinstance(spans, list):
-        raise ValueError("AI4Privacy row requires text/source_text and entities/spans")
+        raise ValueError("AI4Privacy row requires text/source_text and entities/spans/privacy_mask")
     entities: list[dict[str, Any]] = []
     for span in spans:
         if not isinstance(span, Mapping):
@@ -225,15 +257,22 @@ def normalize_ai4privacy_record(raw: Mapping[str, Any]) -> dict[str, Any] | None
             or not 0 <= start < end <= len(text)
         ):
             raise ValueError("AI4Privacy span has invalid offsets")
+        supplied_value = span.get("value", span.get("text"))
+        if supplied_value is not None and supplied_value != text[start:end]:
+            raise ValueError("AI4Privacy span value does not match its offsets")
         entities.append({"type": entity_type, "start": start, "end": end, "text": text[start:end]})
-    return {"id": raw.get("id", "ai4privacy"), "text": text, "entities": entities}
+    return {
+        "id": raw.get("id", raw.get("uid", "ai4privacy")),
+        "text": text,
+        "entities": entities,
+    }
 
 
 def prepare_jsonl(
     *,
     input_path: Path,
     output_path: Path,
-    source_format: Literal["hushmark", "ai4privacy"],
+    source_format: Literal["hushmark", "synthetic-full", "ai4privacy"],
     labels: Mapping[str, str],
     limit: int | None = None,
 ) -> tuple[int, str]:
@@ -250,10 +289,11 @@ def prepare_jsonl(
             raw = json.loads(line)
             if not isinstance(raw, dict):
                 raise ValueError(f"invalid object at line {line_number}")
-            normalized = raw if source_format == "hushmark" else normalize_ai4privacy_record(raw)
+            normalized = normalize_ai4privacy_record(raw) if source_format == "ai4privacy" else raw
             if normalized is None:
                 continue
-            record = prepare_record(normalized, labels, source=source_format)
+            record_source = "hushmark-bench-v0" if source_format == "hushmark" else source_format
+            record = prepare_record(normalized, labels, source=record_source)
             encoded = json.dumps(record, ensure_ascii=False, separators=(",", ":")) + "\n"
             output.write(encoded)
             digest.update(encoded.encode())
@@ -283,6 +323,35 @@ def sha256_file(path: Path) -> str:
         for chunk in iter(lambda: source.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def prepared_record_fingerprint(record: Mapping[str, Any]) -> str:
+    """Hash only model-visible content so renamed evaluation rows are still detected."""
+
+    payload = {
+        "tokenized_text": record.get("tokenized_text"),
+        "ner": record.get("ner"),
+    }
+    encoded = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(encoded.encode()).hexdigest()
+
+
+def assert_evaluation_isolation(
+    training_records: Iterable[Mapping[str, Any]],
+    evaluation_records: Iterable[Mapping[str, Any]],
+) -> None:
+    """Reject source, id, or model-visible content overlap with locked evaluation data."""
+
+    evaluation = list(evaluation_records)
+    evaluation_ids = {str(record.get("id")) for record in evaluation}
+    evaluation_fingerprints = {prepared_record_fingerprint(record) for record in evaluation}
+    for record in training_records:
+        if record.get("source") == "hushmark-bench-v0":
+            raise ValueError("training data contains the locked evaluation source")
+        if str(record.get("id")) in evaluation_ids:
+            raise ValueError("training data contains a locked evaluation record id")
+        if prepared_record_fingerprint(record) in evaluation_fingerprints:
+            raise ValueError("training data contains locked evaluation content")
 
 
 def ner_macro_f1(result: Mapping[str, Any]) -> tuple[float, dict[str, float]]:

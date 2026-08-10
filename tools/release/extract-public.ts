@@ -46,7 +46,13 @@ const SOURCE_DIRECTORIES = [
   "tools/boundary-fixtures",
   "tools/codegen",
 ] as const;
-const SCRIPT_FILES = ["scripts/check-dependency-fixture.mjs"] as const;
+const SCRIPT_FILES = [
+  "scripts/bootstrap-gpu.sh",
+  "scripts/build-training-bundle.py",
+  "scripts/check-dependency-fixture.mjs",
+  "scripts/fetch-models.py",
+  "scripts/verify-training-bundle.py",
+] as const;
 
 export interface ExtractOptions {
   repoRoot: string;

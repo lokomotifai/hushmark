@@ -4,7 +4,8 @@
 
 `hushmark-tr` is a reproducible candidate pipeline, not the v0.1 production model. The production
 runtime continues to use the pinned `urchade/gliner_multi_pii-v1` incumbent until a full checkpoint
-passes the machine-readable adoption rule. The paid/GPU run is pending AC-1 authorization.
+passes the machine-readable adoption rule. The paid/GPU run remains unperformed; its isolated
+RunPod execution package and runbook are ready for the authorized AC-1 operation.
 
 ## Intended use
 
@@ -19,9 +20,11 @@ for their own data.
 
 ## Data provenance
 
-- Required local source: seeded synthetic `hushmark-bench-v0`, whose lock digest is committed.
-- Scaled source: 200,592 deterministic examples, balanced across six domains, four morphology
-  modes, and every domain/morphology intersection.
+- Locked evaluation source: seeded synthetic `hushmark-bench-v0`, whose lock digest is committed
+  and whose 2,016 rows are forbidden from training.
+- Scaled training source: 200,592 deterministic examples generated strictly after the locked
+  range, balanced across six domains, four morphology modes, and every domain/morphology
+  intersection.
 - Optional source: an approved Turkish AI4Privacy export. Network access, dataset terms, exact
   revision, source digest, and scale remain pending and must be recorded before a full run.
 - No private strategy corpus or customer data is a training source.
@@ -31,9 +34,11 @@ for their own data.
 The base model and tokenizer are resolved from the offline pinned registry. Smoke mode uses 200
 seeded examples drawn after the eight repetitions reserved for the locked benchmark, one CPU
 epoch, and a frozen transformer encoder; it updates the remaining GLiNER NER layers and writes
-weights plus a manifest. Full mode rejects records marked as originating from the evaluation
-benchmark. Full-run hyperparameters, hardware, energy/time, dataset hashes, and output digest
-remain pending AC-1.
+weights plus a manifest. Full mode rejects records with the evaluation source, an evaluation ID,
+or identical model-visible content. CUDA mode supports automatic BF16/FP16, bounded ineligible
+pilots, atomic checkpoints, two-checkpoint retention, and compatible-run resume. The planned
+single-A100 configuration is documented in `docs/train-runpod.md`; actual hardware, time, dataset
+hashes, loss, and output digest remain pending the external AC-1 run.
 
 ## Evaluation and adoption
 

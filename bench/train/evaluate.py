@@ -25,10 +25,13 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class CheckpointBackend:
-    def __init__(self, checkpoint: Path, labels: dict[str, str], model_id: str) -> None:
+    def __init__(
+        self, checkpoint: Path, labels: dict[str, str], model_id: str, device: str
+    ) -> None:
         self.checkpoint = checkpoint
         self._label_to_type = {label: entity_type for entity_type, label in labels.items()}
         self._model_id = model_id
+        self._device = device
         self._model: Any | None = None
         self._weights = checkpoint / "pytorch_model.bin"
         self._sha256 = sha256_file(self._weights)
@@ -44,9 +47,13 @@ class CheckpointBackend:
     def load(self) -> None:
         if self._model is None:
             gliner_class = importlib.import_module("gliner").GLiNER
-            self._model = gliner_class.from_pretrained(
-                str(self.checkpoint), local_files_only=True, map_location="cpu"
-            ).eval()
+            self._model = (
+                gliner_class.from_pretrained(
+                    str(self.checkpoint), local_files_only=True, map_location="cpu"
+                )
+                .to(self._device)
+                .eval()
+            )
 
     def is_ready(self) -> bool:
         return self._model is not None
@@ -66,6 +73,7 @@ def main() -> int:
     parser.add_argument("--checkpoint", type=Path, required=True)
     parser.add_argument("--report", type=Path, required=True)
     parser.add_argument("--limit", type=int)
+    parser.add_argument("--device", choices=("cpu", "cuda", "mps"), default="cpu")
     parser.add_argument("--registry", type=Path, default=ROOT / "core/models.yaml")
     parser.add_argument(
         "--incumbent", type=Path, default=ROOT / "bench/reports/v0-baseline-core.json"
@@ -77,7 +85,7 @@ def main() -> int:
     if not isinstance(manifest, dict):
         raise ValueError("checkpoint manifest must be an object")
     labels = load_model_labels(args.registry)
-    backend = CheckpointBackend(args.checkpoint, labels, str(manifest["model_id"]))
+    backend = CheckpointBackend(args.checkpoint, labels, str(manifest["model_id"]), args.device)
     if backend.model_sha256 != manifest.get("weights_sha256"):
         raise ValueError("checkpoint weights do not match the training manifest")
     settings = Settings()
@@ -101,7 +109,7 @@ def main() -> int:
     candidate: dict[str, Any] = {
         "schema_version": 1,
         "engine": "hushmark-tr-candidate",
-        "backend": "torch",
+        "backend": f"torch:{args.device}",
         "model_id": engine.model_id,
         "model_sha256": engine.model_sha256,
         "dataset": {
@@ -114,7 +122,7 @@ def main() -> int:
         "partial": partial,
     }
     incumbent = json.loads(args.incumbent.read_text(encoding="utf-8"))
-    eligible = not bool(manifest.get("smoke")) and args.limit is None
+    eligible = bool(manifest.get("adoption_eligible")) and args.limit is None
     verdict = adoption_verdict(candidate, cast(dict[str, Any], incumbent), eligible=eligible)
     report = {
         "schema_version": 1,

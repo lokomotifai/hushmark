@@ -16,7 +16,11 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--input", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--source-format", choices=("hushmark", "ai4privacy"), required=True)
+    parser.add_argument(
+        "--source-format",
+        choices=("hushmark", "synthetic-full", "ai4privacy"),
+        required=True,
+    )
     parser.add_argument("--limit", type=int)
     parser.add_argument("--registry", type=Path, default=ROOT / "core/models.yaml")
     args = parser.parse_args()
@@ -24,7 +28,7 @@ def main() -> int:
     count, digest = prepare_jsonl(
         input_path=args.input,
         output_path=args.output,
-        source_format=cast(Literal["hushmark", "ai4privacy"], args.source_format),
+        source_format=cast(Literal["hushmark", "synthetic-full", "ai4privacy"], args.source_format),
         labels=load_model_labels(args.registry),
         limit=args.limit,
     )
