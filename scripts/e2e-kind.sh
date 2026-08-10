@@ -16,6 +16,21 @@ cleanup() {
 }
 trap cleanup EXIT
 
+diagnostics() {
+  local exit_code=$?
+  trap - ERR
+  if kubectl get namespace "$namespace" >/dev/null 2>&1; then
+    echo "kind failure diagnostics:" >&2
+    kubectl -n "$namespace" get pods -o wide >&2 || true
+    kubectl -n "$namespace" get events --sort-by=.lastTimestamp >&2 || true
+    for deployment in hushmark-core hushmark-gateway hushmark-console; do
+      kubectl -n "$namespace" logs "deployment/$deployment" --tail=200 >&2 || true
+    done
+  fi
+  return "$exit_code"
+}
+trap diagnostics ERR
+
 if (($# > 0)); then
   if [[ $# -ne 2 || $1 != "--airgap" ]]; then
     echo "usage: $0 [--airgap PATH]" >&2

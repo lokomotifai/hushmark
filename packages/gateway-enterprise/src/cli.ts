@@ -12,6 +12,7 @@ import type { Kms } from "./kms/types.js";
 import { VaultTransitKms } from "./kms/vaultTransit.js";
 import { SqlPolicyRepository } from "./policy/db.js";
 import { buildEnterpriseServer } from "./server.js";
+import { retryStartup } from "./startup.js";
 import { SqlVaultRepository } from "./vault/repository.js";
 
 const config = EnvSchema.parse(
@@ -23,7 +24,7 @@ const licenseFile = requiredEnv("HUSHMARK_LICENSE_FILE");
 const keyId = requiredEnv("HUSHMARK_KMS_KEY_ID");
 const executor = new PostgresExecutor(databaseUrl);
 const identity = new SqlIdentityRepository(executor);
-await ensureBootstrapAdmin(identity);
+await retryStartup(() => ensureBootstrapAdmin(identity), { attempts: 60, delayMs: 1_000 });
 
 const publicKeyFile = process.env.HUSHMARK_LICENSE_PUBLIC_KEY_FILE;
 const runtime = await buildEnterpriseServer({
