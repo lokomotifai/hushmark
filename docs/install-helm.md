@@ -41,5 +41,39 @@ helm upgrade --install hushmark deploy/helm/hushmark \
 Verify `deployment/hushmark-core` and `deployment/hushmark-gateway` readiness. Expose only the
 gateway through an authenticated internal ingress. The core Service must remain `ClusterIP`.
 
+## Shared-cluster release
+
+`values.shared.yaml` pins the three published v0.1.0 GHCR images by their verified manifest
+digests. It deploys the open-core core and gateway only; the console, enterprise features, and
+bundled PostgreSQL remain disabled.
+
+The published core image is intentionally model-free. Before deployment, create and populate an
+encrypted persistent volume claim named `hushmark-models`. The claim must expose this exact layout
+read-only to the core workload:
+
+```text
+/models/hushmark-tr/gliner_config.json
+/models/hushmark-tr/model.onnx
+/models/hushmark-tr/tokenizer.json
+/models/hushmark-tr/tokenizer_config.json
+```
+
+Verify the local model checksum against the adopted release evidence before copying it to the
+volume. Do not publish the model directory to the public container registry.
+
+The manual `Deploy shared Kubernetes` workflow has two modes. `plan` validates and renders without
+cluster credentials. `apply` uses the protected `shared-production` GitHub environment and requires
+these environment secrets:
+
+- `KUBE_CONFIG_B64`: base64-encoded kubeconfig scoped to the target namespace.
+- `HUSHMARK_API_KEYS`: one or more gateway keys accepted by the open-core gateway.
+- `HUSHMARK_OPENAI_API_KEY`: optional upstream credential.
+- `HUSHMARK_ANTHROPIC_API_KEY`: optional upstream credential.
+
+Create the namespace and bound model PVC before selecting `apply`. The workflow reconciles only the
+gateway Secret and the Helm release, uses `--atomic`, waits for both rollouts, and verifies gateway
+readiness through a temporary port-forward. Keep environment approval protection enabled so a
+rendered plan can be reviewed before cluster mutation.
+
 See [configuration](config.md) for runtime settings and [security](security.md) for trust
 boundaries and production controls.

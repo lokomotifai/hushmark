@@ -73,11 +73,36 @@ def check_compose() -> None:
 def check_chart() -> None:
     chart = yaml.safe_load((CHART_DIR / "Chart.yaml").read_text(encoding="utf-8"))
     values = yaml.safe_load((CHART_DIR / "values.yaml").read_text(encoding="utf-8"))
+    shared_values = yaml.safe_load((CHART_DIR / "values.shared.yaml").read_text(encoding="utf-8"))
     schema = json.loads((CHART_DIR / "values.schema.json").read_text(encoding="utf-8"))
     assert chart["version"] == chart["appVersion"] == "0.1.0"
     assert values["networkPolicy"]["enabled"] is True
     assert values["core"]["model"]["baked"] is True
     assert values["postgres"]["enabled"] is False
+    assert shared_values["fullnameOverride"] == "hushmark"
+    assert shared_values["core"]["model"] == {
+        "baked": False,
+        "existingClaim": "hushmark-models",
+    }
+    assert shared_values["console"]["enabled"] is False
+    expected_images = {
+        "core": (
+            "ghcr.io/hushmark/core",
+            "sha256:98ebc594b2817d3c1c46c5d422886a1374c24bbd25fe53c18bbeb2b026a63c7b",
+        ),
+        "gateway": (
+            "ghcr.io/hushmark/gateway",
+            "sha256:423d01f2b32dea264bef3b9bbe7fa697b28dd776979488dde8e58c79cd534515",
+        ),
+        "console": (
+            "ghcr.io/hushmark/console",
+            "sha256:d43296d6193df179bd8930cc4bb513084923cb666b6a5c21cb00985611470b0d",
+        ),
+    }
+    for workload, (repository, digest) in expected_images.items():
+        image = shared_values[workload]["image"]
+        assert image["repository"] == repository
+        assert image["digest"] == digest
     assert "postgres" in schema["properties"]
     source = (ROOT / "packages/gateway-enterprise/drizzle/0000_initial.sql").read_bytes()
     packaged = (CHART_DIR / "files/0000_initial.sql").read_bytes()
