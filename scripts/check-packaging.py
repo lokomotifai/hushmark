@@ -70,6 +70,73 @@ def check_compose() -> None:
     assert services["console"]["ports"] == ["127.0.0.1:3000:3000"]
 
 
+def check_production_compose() -> None:
+    path = DOCKER_DIR / "compose.production.yaml"
+    content = path.read_text(encoding="utf-8")
+    compose = yaml.safe_load(content)
+    services = compose["services"]
+    assert set(services) == {"core", "gateway", "caddy"}
+    expected_images = {
+        "core": (
+            "ghcr.io/hushmark/core@"
+            "sha256:98ebc594b2817d3c1c46c5d422886a1374c24bbd25fe53c18bbeb2b026a63c7b"
+        ),
+        "gateway": (
+            "ghcr.io/hushmark/gateway@"
+            "sha256:423d01f2b32dea264bef3b9bbe7fa697b28dd776979488dde8e58c79cd534515"
+        ),
+        "caddy": (
+            "caddy:2.10.2-alpine@"
+            "sha256:4c6e91c6ed0e2fa03efd5b44747b625fec79bc9cd06ac5235a779726618e530d"
+        ),
+    }
+    for name, image in expected_images.items():
+        service = services[name]
+        assert service["image"] == image
+        assert service["read_only"] is True
+        assert service["cap_drop"] == ["ALL"]
+        assert "no-new-privileges:true" in service["security_opt"]
+        assert "build" not in service
+
+    assert "ports" not in services["core"]
+    assert "ports" not in services["gateway"]
+    assert services["core"]["networks"] == ["backend"]
+    assert services["gateway"]["networks"] == ["edge", "backend"]
+    assert compose["networks"]["backend"]["internal"] is True
+    assert services["core"]["volumes"][0]["read_only"] is True
+    assert services["core"]["volumes"][0]["bind"]["create_host_path"] is False
+
+    gateway_environment = services["gateway"]["environment"]
+    assert "HUSHMARK_API_KEYS" not in gateway_environment
+    assert "HUSHMARK_OPENAI_API_KEY" not in gateway_environment
+    assert "HUSHMARK_ANTHROPIC_API_KEY" not in gateway_environment
+    assert services["gateway"]["secrets"] == [
+        "hushmark_api_keys",
+        "openai_api_key",
+        "anthropic_api_key",
+    ]
+    assert set(compose["secrets"]) == {
+        "hushmark_api_keys",
+        "openai_api_key",
+        "anthropic_api_key",
+    }
+
+    assert "fake-upstream" not in content
+    assert "hushmark-evaluation" not in content
+    assert "POSTGRES_PASSWORD" not in content
+    assert "VAULT_DEV_ROOT_TOKEN_ID" not in content
+    assert (DOCKER_DIR / "production" / "policy.yaml").read_bytes() == (
+        ROOT / "packages/gateway/policy.yaml"
+    ).read_bytes()
+    entrypoint = (DOCKER_DIR / "production" / "gateway-entrypoint.sh").read_text(encoding="utf-8")
+    assert "set -eu" in entrypoint
+    assert "set -x" not in entrypoint
+    assert "/run/secrets/hushmark_api_keys" in entrypoint
+    caddyfile = (DOCKER_DIR / "production" / "Caddyfile").read_text(encoding="utf-8")
+    assert "reverse_proxy gateway:8080" in caddyfile
+    assert "Strict-Transport-Security" in caddyfile
+
+
 def check_chart() -> None:
     chart = yaml.safe_load((CHART_DIR / "Chart.yaml").read_text(encoding="utf-8"))
     values = yaml.safe_load((CHART_DIR / "values.yaml").read_text(encoding="utf-8"))
@@ -118,6 +185,7 @@ def main() -> None:
     check_versions()
     check_dockerfiles()
     check_compose()
+    check_production_compose()
     check_chart()
     print("Container and Helm packaging contracts passed.")
 

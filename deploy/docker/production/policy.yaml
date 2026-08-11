@@ -1,0 +1,18 @@
+version: 1
+defaults:
+  unknown_entity: block
+  multimodal: block
+  collision_mode: reject
+  response_scan: off
+rules:
+  - match: { kvkk_class: special }
+    action: block
+  - match: { kvkk_class: secret }
+    action: block
+  - match:
+      types: [TR_TCKN, TR_VKN, TR_IBAN, IBAN_OTHER, CREDIT_CARD, TR_PHONE, TR_PLATE, TR_SGK]
+    action: mask
+  - match: { types: [PERSON, ADDRESS, EMAIL] }
+    action: mask
+  - match: { types: [ORG] }
+    action: allow

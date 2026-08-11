@@ -37,8 +37,9 @@ remove evaluation state with the exact Compose files:
 docker compose -f deploy/docker/compose.yaml -f deploy/docker/compose.dev.yaml down -v
 ```
 
-## Production changes
+## Production
 
-Replace every evaluation secret, use a persistent non-dev Vault/KMS target, configure PostgreSQL
-backups, pin image digests, restrict host/network access, provide an issued license, and route only
-approved provider endpoints. Keep core private to the service network.
+Do not promote this evaluation file by replacing its passwords. It intentionally contains a fake
+provider and development-only state. Use the independent
+[single-host production package](install-compose-production.md), which runs only the open-core
+core, gateway, and HTTPS boundary with digest-pinned images and file-backed secrets.

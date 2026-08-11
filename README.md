@@ -32,7 +32,8 @@ pinned FP32 ONNX graph and never regenerates a production model implicitly.
 docker compose -f deploy/docker/compose.yaml -f deploy/docker/compose.dev.yaml up -d
 ```
 
-See [Compose installation](docs/install-compose.md), [Helm installation](docs/install-helm.md),
+See [Compose evaluation](docs/install-compose.md),
+[single-host production](docs/install-compose-production.md), [Helm installation](docs/install-helm.md),
 [air-gap installation](docs/install-airgap.md), and the [security model](docs/security.md).
 
 ## License intent
