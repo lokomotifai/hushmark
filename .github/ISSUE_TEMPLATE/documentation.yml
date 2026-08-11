@@ -1,0 +1,32 @@
+name: Documentation issue
+description: Report missing, unclear, or incorrect documentation.
+title: "[Docs]: "
+labels: [documentation, triage]
+body:
+  - type: input
+    id: location
+    attributes:
+      label: Page or file
+      placeholder: URL or repository path
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What is unclear or incorrect?
+    validations:
+      required: true
+  - type: textarea
+    id: improvement
+    attributes:
+      label: Suggested improvement
+      description: A proposed wording or example is welcome but not required.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: I checked the current `main` branch.
+          required: true
+        - label: I have not included confidential or personal data.
+          required: true

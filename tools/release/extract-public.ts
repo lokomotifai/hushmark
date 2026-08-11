@@ -24,8 +24,18 @@ const ROOT_FILES = [
   ".prettierrc.json",
   ".python-version",
   "CHANGELOG.md",
-  "README.md",
+  "CODE_OF_CONDUCT.md",
+  "GOVERNANCE.md",
+  "MAINTAINERS.md",
+  "NOTICE",
+  "ORIGIN_AND_ATTRIBUTION.md",
   "THIRD_PARTY_NOTICES.md",
+  "TRADEMARKS.md",
+  ".github/CODEOWNERS",
+  ".github/ISSUE_TEMPLATE/bug.yml",
+  ".github/ISSUE_TEMPLATE/documentation.yml",
+  ".github/ISSUE_TEMPLATE/feature.yml",
+  ".github/ISSUE_TEMPLATE/question.yml",
   "eslint.config.mjs",
   "package.json",
   "pnpm-lock.yaml",
@@ -296,7 +306,7 @@ async function writeGeneratedFiles(repoRoot: string, output: string): Promise<vo
   packageJson.version = VERSION;
   await writeFile(join(output, "package.json"), `${JSON.stringify(packageJson, null, 2)}\n`);
   await writeFile(join(output, "pnpm-workspace.yaml"), publicWorkspace());
-  await writeFile(join(output, "LICENSE"), await readFile(join(repoRoot, "core/LICENSE"), "utf8"));
+  await writeFile(join(output, "LICENSE"), await readFile(join(repoRoot, "LICENSE"), "utf8"));
   await mkdir(join(output, "scripts"), { recursive: true });
   await writeFile(join(output, "scripts/bootstrap.sh"), publicBootstrap(), { mode: 0o755 });
   await writeFile(join(output, "scripts/verify.sh"), publicVerify(), { mode: 0o755 });
@@ -338,6 +348,8 @@ export async function extractPublicTree(options: ExtractOptions): Promise<void> 
   for (const path of ROOT_FILES) await copyEntry(repoRoot, output, path);
   for (const path of SOURCE_DIRECTORIES) await copyEntry(repoRoot, output, path);
   for (const path of SCRIPT_FILES) await copyEntry(repoRoot, output, path);
+  const publicRoot = join(repoRoot, "tools/release/public-root");
+  for (const entry of await readdir(publicRoot)) await copyEntry(publicRoot, output, entry);
   await writeGeneratedFiles(repoRoot, output);
   await assertNoLeak(output);
   console.log(`public mirror extracted to ${output}`);

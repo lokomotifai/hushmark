@@ -1,0 +1,71 @@
+name: Bug report
+description: Report a reproducible problem in Hushmark.
+title: "[Bug]: "
+labels: [bug, triage]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. Do not include credentials, personal data, customer payloads, private corpora, or model weights. Report vulnerabilities through the private security channel instead.
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      description: Use an exact release, image digest, package version, or commit SHA.
+      placeholder: v0.1.0 / sha256:… / commit SHA
+    validations:
+      required: true
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      options:
+        - Core detector
+        - Gateway
+        - Console
+        - TypeScript SDK
+        - Python SDK
+        - Benchmark or taxonomy
+        - Deployment or release tooling
+        - Documentation
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: Describe the observed and expected behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: Provide safe, synthetic input and exact commands or code.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, runtime versions, deployment path, model backend, and relevant configuration with secrets removed.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Safe logs or evidence
+      description: Redact identifiers and tokens. Attach only information safe to publish forever.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: I searched existing issues and pull requests.
+          required: true
+        - label: This report contains no secrets, real personal data, customer payloads, private corpora, or model weights.
+          required: true
+        - label: This is not a vulnerability report.
+          required: true

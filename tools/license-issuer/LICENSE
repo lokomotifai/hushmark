@@ -1,7 +1,4 @@
-Hushmark Enterprise Source License
+This directory is part of Hushmark and is licensed under the Apache License, Version 2.0.
+The complete license text is available at ../../LICENSE.
 
-Copyright (c) 2026 Hushmark. All rights reserved.
-
-This source code is proprietary and confidential. Possession of this source code does not grant
-permission to use, copy, modify, distribute, sublicense, publish, or provide it to a third party.
-A separate written agreement with the copyright holder is required for every such right.
+Copyright 2026 Lokomotif AI
