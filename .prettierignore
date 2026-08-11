@@ -10,3 +10,5 @@ dist/
 pnpm-lock.yaml
 uv.lock
 packages/shared/src/taxonomy.gen.ts
+bench/external-data/
+bench/external/

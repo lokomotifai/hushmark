@@ -31,6 +31,8 @@ def test_training_bundle_is_reproducible_allowlisted_and_self_verifying(tmp_path
     assert names
     assert all(name.startswith("hushmark-ac1-training-0.1.0/") for name in names)
     assert not any("/bench/train/outputs/" in name for name in names)
+    assert not any("/bench/external/" in name for name in names)
+    assert not any("/bench/external-data/" in name for name in names)
     assert not any("/models/" in name for name in names)
     assert not any(part in {"briefs", "research"} for name in names for part in Path(name).parts)
 

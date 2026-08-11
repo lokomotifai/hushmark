@@ -24,6 +24,8 @@ tmp/pdfs/
 output/pdf/*.pdf
 perf/reports/*.json
 bench/train/outputs/
+bench/external-data/
+bench/external/
 
 # Private planning and research inputs; never commit or publish.
 /briefs/

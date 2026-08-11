@@ -7,7 +7,17 @@ docker_ignore_file="$repo_dir/.dockerignore"
 canary="HUSHMARK-CORPUS-"
 canary+="CANARY-7f3a9d"
 
-required=(research briefs hushmark PLAN.md PLAN-BRIEF.md EXECUTABLE-PLAN-PROMPT.md)
+required=(
+  research
+  briefs
+  hushmark
+  PLAN.md
+  PLAN-BRIEF.md
+  EXECUTABLE-PLAN-PROMPT.md
+  bench/external
+  bench/external-data
+  bench/train/outputs
+)
 for path in "${required[@]}"; do
   if ! grep -Fxq "$path" "$ignore_file"; then
     echo "Missing build-context exclusion: $path" >&2
@@ -34,8 +44,8 @@ tar -C "$repo_dir" \
   --exclude=.git \
   -cf "$tmp_dir/context.tar" .
 
-if tar -tf "$tmp_dir/context.tar" | grep -E '(^|/)(research|briefs|hushmark)(/|$)|(^|/)PLAN(-BRIEF)?\.md$|EXECUTABLE-PLAN-PROMPT\.md'; then
-  echo "Private corpus path leaked into the build context." >&2
+if tar -tf "$tmp_dir/context.tar" | grep -E '(^|/)(research|briefs|hushmark)(/|$)|(^|/)PLAN(-BRIEF)?\.md$|EXECUTABLE-PLAN-PROMPT\.md|(^|/)bench/(external(-data)?|train/outputs)(/|$)'; then
+  echo "Private or local-only path leaked into the build context." >&2
   exit 1
 fi
 

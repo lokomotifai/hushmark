@@ -5,6 +5,9 @@ node_modules
 .venv
 dist
 models
+bench/external
+bench/external-data
+bench/train/outputs
 research
 briefs
 hushmark

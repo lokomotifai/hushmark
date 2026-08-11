@@ -10,6 +10,7 @@ import io
 import json
 import os
 import tarfile
+from collections.abc import Iterator
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -43,6 +44,8 @@ SKIP_NAMES = frozenset(
         ".ruff_cache",
         "__pycache__",
         "dist",
+        "external",
+        "external-data",
         "node_modules",
     }
 )
@@ -63,12 +66,23 @@ def include_path(relative: Path) -> bool:
     )
 
 
+def iter_source_files(directory: Path) -> Iterator[Path]:
+    """Walk a source tree without descending into local-only or generated directories."""
+    for current, directories, filenames in os.walk(directory, topdown=True):
+        current_path = Path(current)
+        directories[:] = sorted(name for name in directories if name not in SKIP_NAMES)
+        if current_path.relative_to(ROOT) == Path("bench/train"):
+            directories[:] = [name for name in directories if name != "outputs"]
+        for filename in sorted(filenames):
+            yield current_path / filename
+
+
 def collect_files() -> dict[str, tuple[bytes, int]]:
     selected: dict[str, tuple[bytes, int]] = {}
     candidates = [ROOT / path for path in ROOT_FILES]
     candidates.extend(ROOT / path for path in SCRIPT_FILES)
     for directory in SOURCE_DIRECTORIES:
-        candidates.extend(sorted((ROOT / directory).rglob("*")))
+        candidates.extend(iter_source_files(ROOT / directory))
 
     canary = ("HUSHMARK-CORPUS-" + "CANARY-7f3a9d").encode()
     for path in candidates:

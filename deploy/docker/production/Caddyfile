@@ -1,0 +1,29 @@
+{
+	admin off
+	servers {
+		protocols h1 h2 h3
+	}
+}
+
+{$HUSHMARK_DOMAIN} {
+	encode zstd gzip
+
+	header {
+		-Server
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options nosniff
+		Referrer-Policy no-referrer
+		X-Frame-Options DENY
+	}
+
+	request_body {
+		max_size 10MB
+	}
+
+	reverse_proxy gateway:8080
+
+	log {
+		output stdout
+		format json
+	}
+}
