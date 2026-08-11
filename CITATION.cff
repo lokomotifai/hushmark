@@ -1,0 +1,13 @@
+cff-version: 1.2.0
+message: "If you use Hushmark in research, please cite the software using this metadata."
+type: software
+title: Hushmark
+abstract: "Turkish-first PII detection, reversible masking, and controlled restoration for AI traffic."
+authors:
+  - family-names: Guner
+    given-names: Fatih
+repository-code: "https://github.com/hushmark/hushmark"
+url: "https://github.com/hushmark/hushmark"
+version: 0.1.0
+date-released: 2026-08-10
+license: Apache-2.0

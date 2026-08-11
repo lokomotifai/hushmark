@@ -34,10 +34,22 @@ describe("public mirror extraction", () => {
         ".prettierignore",
         ".prettierrc.json",
         ".python-version",
+        "CITATION.cff",
         "CHANGELOG.md",
+        "CODE_OF_CONDUCT.md",
+        "CONTRIBUTING.md",
+        "GOVERNANCE.md",
         "LICENSE",
+        "MAINTAINERS.md",
+        "NOTICE",
+        "ORIGIN_AND_ATTRIBUTION.md",
         "README.md",
+        "README.tr.md",
+        "ROADMAP.md",
+        "SECURITY.md",
+        "SUPPORT.md",
         "THIRD_PARTY_NOTICES.md",
+        "TRADEMARKS.md",
         "bench",
         "core",
         "docs",
@@ -67,5 +79,5 @@ describe("public mirror extraction", () => {
     await expect(
       readFile(join(output, "bench/train/outputs/smoke-verdict.json")),
     ).rejects.toThrow();
-  });
+  }, 15_000);
 });

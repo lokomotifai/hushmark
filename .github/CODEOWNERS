@@ -1,0 +1,9 @@
+# Default review owner
+* @fatihguner
+
+# High-risk project surfaces
+/.github/ @fatihguner
+/SECURITY.md @fatihguner
+/deploy/ @fatihguner
+/tools/release/ @fatihguner
+/tools/license-issuer/ @fatihguner

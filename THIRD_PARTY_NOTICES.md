@@ -17,5 +17,5 @@ Dockerfiles and Helm values.
 | DejaVu Sans                              | PDF fonts                                | DejaVu Fonts License                                                            |
 | Faker synthetic providers                | benchmark generation                     | MIT                                                                             |
 
-Before external distribution, regenerate SBOMs, retain their license fields, inspect any unknown or
-copyleft entries, and attach the relevant upstream license texts to the delivery bundle.
+For every external distribution, regenerate SBOMs, retain their license fields, inspect any unknown
+or copyleft entries, and attach the relevant upstream license texts to the delivery bundle.

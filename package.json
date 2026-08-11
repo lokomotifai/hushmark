@@ -2,6 +2,7 @@
   "name": "hushmark-monorepo",
   "version": "0.1.0",
   "private": true,
+  "license": "Apache-2.0",
   "packageManager": "pnpm@9.15.9",
   "engines": {
     "node": "22.x",

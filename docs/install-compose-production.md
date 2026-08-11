@@ -21,7 +21,7 @@ Use Ubuntu 24.04 or another supported Linux distribution on `amd64` or `arm64`, 
 Compose v2, at least 2 CPU cores and 8 GiB memory, a fully qualified domain name, and these paths:
 
 ```text
-/opt/hushmark/repo/                         # clean private repository checkout
+/opt/hushmark/repo/                         # clean repository checkout at an approved ref
 /etc/hushmark/production.env               # mode 0600, non-secret deployment settings
 /etc/hushmark/secrets/api-keys              # mode 0600, required
 /etc/hushmark/secrets/openai-api-key        # mode 0600, may be empty
@@ -42,7 +42,7 @@ tokenizer_config.json
 
 ## Prepare without deploying
 
-Clone the private repository into `/opt/hushmark/repo`. Create the host directories with root-only
+Clone the repository into `/opt/hushmark/repo` and check out the approved release ref. Create the host directories with root-only
 permissions, copy `deploy/docker/production.env.example` to `/etc/hushmark/production.env`, and
 replace the example domain. Store client/provider keys in the three separate secret files; never
 put them in the repository or Compose environment block. Generate a client key with at least 128

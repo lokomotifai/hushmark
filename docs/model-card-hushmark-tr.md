@@ -4,8 +4,9 @@
 
 `hushmark-tr` is the locally adopted v0.1 production NER model. The guarded AC-1 retry on
 2026-08-10 passed the isolated development gate, the locked adoption gate, and FP32 ONNX parity.
-It replaces `urchade/gliner_multi_pii-v1` as the local runtime default. The model and release
-artifacts have not been uploaded or published; external distribution remains behind AC-2.
+It replaces `urchade/gliner_multi_pii-v1` as the local runtime default. Public source, packages, and
+model-free runtime images were released through AC-2. The adopted model weights remain outside the
+public Git repositories and public images and are distributed separately with checksum verification.
 
 ## Intended use
 
@@ -106,5 +107,6 @@ customer-specific evaluation remains required future evidence.
 
 The upstream GLiNER model is Apache-2.0 and the pinned mDeBERTa base is MIT. The locally retained
 model is derived only from those components and Hushmark-generated synthetic data. Exact artifact
-hashes are pinned in `core/models.yaml`. No model weight, image, package, or registry artifact was
-published externally during AC-1.
+hashes are pinned in `core/models.yaml`. AC-1 did not publish artifacts; the later AC-2 release
+published source, packages, and model-free images. The adopted weight files are still distributed
+separately and must match the pinned hashes before use.
