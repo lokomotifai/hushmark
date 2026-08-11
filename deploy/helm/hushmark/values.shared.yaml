@@ -1,0 +1,39 @@
+# Shared-cluster open-core deployment. Images are pinned to the verified v0.1.0
+# GHCR manifest digests. The adopted model remains private and must already be
+# present in the named PVC at /models/hushmark-tr before deployment.
+
+fullnameOverride: hushmark
+
+core:
+  image:
+    repository: ghcr.io/hushmark/core
+    tag: 0.1.0
+    digest: sha256:98ebc594b2817d3c1c46c5d422886a1374c24bbd25fe53c18bbeb2b026a63c7b
+    pullPolicy: IfNotPresent
+  model:
+    baked: false
+    existingClaim: hushmark-models
+
+gateway:
+  image:
+    repository: ghcr.io/hushmark/gateway
+    tag: 0.1.0
+    digest: sha256:423d01f2b32dea264bef3b9bbe7fa697b28dd776979488dde8e58c79cd534515
+    pullPolicy: IfNotPresent
+
+console:
+  enabled: false
+  image:
+    repository: ghcr.io/hushmark/console
+    tag: 0.1.0
+    digest: sha256:d43296d6193df179bd8930cc4bb513084923cb666b6a5c21cb00985611470b0d
+    pullPolicy: IfNotPresent
+
+enterprise:
+  enabled: false
+
+postgres:
+  enabled: false
+
+networkPolicy:
+  enabled: true
