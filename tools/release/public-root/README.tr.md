@@ -4,9 +4,9 @@
 
 **Hushmark’ın yalnızca kaynak kodundan oluşan tespit motoru, ağ geçidi, SDK, benchmark ve taksonomi sürümü.**
 
-[![CI](https://img.shields.io/github/actions/workflow/status/hushmark/hushmark-open-core/ci.yml?branch=main&label=CI)](https://github.com/hushmark/hushmark-open-core/actions/workflows/ci.yml)
-[![Sürüm](https://img.shields.io/github/v/release/hushmark/hushmark-open-core?label=sürüm)](https://github.com/hushmark/hushmark-open-core/releases/latest)
-[![Lisans](https://img.shields.io/github/license/hushmark/hushmark-open-core)](LICENSE)
+[![CI](https://img.shields.io/github/actions/workflow/status/lokomotifai/hushmark-open-core/ci.yml?branch=main&label=CI)](https://github.com/lokomotifai/hushmark-open-core/actions/workflows/ci.yml)
+[![Sürüm](https://img.shields.io/github/v/release/lokomotifai/hushmark-open-core?label=sürüm)](https://github.com/lokomotifai/hushmark-open-core/releases/latest)
+[![Lisans](https://img.shields.io/github/license/lokomotifai/hushmark-open-core)](LICENSE)
 
 [English](README.md) · [Türkçe](README.tr.md) · [Güvenlik](SECURITY.md) · [Katkı](CONTRIBUTING.md)
 
@@ -25,7 +25,7 @@ sağlayıcı yanıtlarında geri yükler.
 ## Bu depo nedir?
 
 Bu depo, kanonik geliştirme deposu olan
-[`hushmark/hushmark`](https://github.com/hushmark/hushmark) içindeki herkese açık çalışma zamanı
+[`lokomotifai/hushmark`](https://github.com/lokomotifai/hushmark) içindeki herkese açık çalışma zamanı
 kaynaklarının izin listesiyle üretilen sürüm aynasıdır. Benimsenen model ağırlıklarını, özel
 değerlendirme veri kümelerini, konsolu, kalıcı kasayı, RBAC’i, denetim kanıtını, lisans üreticisini
 ve dağıtım sırlarını içermez.
@@ -44,7 +44,7 @@ ve dağıtım sırlarını içermez.
 Gereksinimler: Node.js 22, pnpm 9, Python 3.12 ve uv.
 
 ```bash
-git clone https://github.com/hushmark/hushmark-open-core.git
+git clone https://github.com/lokomotifai/hushmark-open-core.git
 cd hushmark-open-core
 ./scripts/bootstrap.sh
 ./scripts/verify.sh

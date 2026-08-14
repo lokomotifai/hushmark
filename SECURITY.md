@@ -5,7 +5,7 @@
 Please do not open a public issue for suspected vulnerabilities or include real personal data,
 credentials, customer payloads, or exploit details in public discussions.
 
-Use [GitHub private vulnerability reporting](https://github.com/hushmark/hushmark/security/advisories/new)
+Use [GitHub private vulnerability reporting](https://github.com/lokomotifai/hushmark/security/advisories/new)
 when available. If that channel is unavailable, email `fatih@komunite.com.tr` with the subject
 `Hushmark security report`. Include affected versions, impact, reproduction steps, and any suggested
 embargo needs. Encrypt sensitive material before sending and first ask for a suitable transfer

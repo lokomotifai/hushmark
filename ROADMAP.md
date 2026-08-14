@@ -30,5 +30,5 @@ Priorities may change as evidence and user feedback improve.
 - Treating synthetic benchmark results as a substitute for representative evaluation.
 - Committing adopted model weights or private evaluation corpora to this repository.
 
-Propose changes through the [feature request form](https://github.com/hushmark/hushmark/issues/new?template=feature.yml)
+Propose changes through the [feature request form](https://github.com/lokomotifai/hushmark/issues/new?template=feature.yml)
 and include the user problem, evidence, alternatives, and security impact.

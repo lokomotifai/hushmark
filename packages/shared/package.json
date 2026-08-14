@@ -15,12 +15,12 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/hushmark/hushmark-open-core.git",
+    "url": "git+https://github.com/lokomotifai/hushmark-open-core.git",
     "directory": "packages/shared"
   },
-  "homepage": "https://github.com/hushmark/hushmark-open-core#readme",
+  "homepage": "https://github.com/lokomotifai/hushmark-open-core#readme",
   "bugs": {
-    "url": "https://github.com/hushmark/hushmark-open-core/issues"
+    "url": "https://github.com/lokomotifai/hushmark-open-core/issues"
   },
   "publishConfig": {
     "access": "public",

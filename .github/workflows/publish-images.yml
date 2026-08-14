@@ -66,15 +66,15 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
-            ghcr.io/hushmark/${{ matrix.name }}:${{ inputs.version }}
-            ghcr.io/hushmark/${{ matrix.name }}:latest
+            ghcr.io/lokomotifai/${{ matrix.name }}:${{ inputs.version }}
+            ghcr.io/lokomotifai/${{ matrix.name }}:latest
           provenance: mode=max
           sbom: true
       - name: Scan, sign, attest, and verify
         env:
-          IMAGE: ghcr.io/hushmark/${{ matrix.name }}
+          IMAGE: ghcr.io/lokomotifai/${{ matrix.name }}
           DIGEST: ${{ steps.build.outputs.digest }}
-          CERTIFICATE_IDENTITY: https://github.com/hushmark/hushmark/.github/workflows/publish-images.yml@refs/heads/main
+          CERTIFICATE_IDENTITY: https://github.com/lokomotifai/hushmark/.github/workflows/publish-images.yml@refs/heads/main
         run: |
           image_ref="${IMAGE}@${DIGEST}"
           syft "$image_ref" \

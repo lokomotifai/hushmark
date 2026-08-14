@@ -6,8 +6,8 @@ abstract: "Turkish-first PII detection, reversible masking, and controlled resto
 authors:
   - family-names: Guner
     given-names: Fatih
-repository-code: "https://github.com/hushmark/hushmark"
-url: "https://github.com/hushmark/hushmark"
+repository-code: "https://github.com/lokomotifai/hushmark"
+url: "https://github.com/lokomotifai/hushmark"
 version: 0.1.0
 date-released: 2026-08-10
 license: Apache-2.0

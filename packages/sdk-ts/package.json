@@ -15,12 +15,12 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/hushmark/hushmark-open-core.git",
+    "url": "git+https://github.com/lokomotifai/hushmark-open-core.git",
     "directory": "packages/sdk-ts"
   },
-  "homepage": "https://github.com/hushmark/hushmark-open-core/tree/main/packages/sdk-ts#readme",
+  "homepage": "https://github.com/lokomotifai/hushmark-open-core/tree/main/packages/sdk-ts#readme",
   "bugs": {
-    "url": "https://github.com/hushmark/hushmark-open-core/issues"
+    "url": "https://github.com/lokomotifai/hushmark-open-core/issues"
   },
   "publishConfig": {
     "access": "public",

@@ -7,7 +7,7 @@ This repository is an allowlist-generated release mirror. To prevent the next ex
 overwriting work:
 
 - propose detector, gateway, SDK, benchmark, or taxonomy code changes in the canonical
-  [`hushmark/hushmark`](https://github.com/hushmark/hushmark) repository;
+  [`lokomotifai/hushmark`](https://github.com/lokomotifai/hushmark) repository;
 - use this repository for mirror-specific documentation, packaging, release, or community fixes;
 - open an issue first if you are unsure which boundary owns the change.
 

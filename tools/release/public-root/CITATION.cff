@@ -6,8 +6,8 @@ abstract: "Source-only Turkish PII detector, masking gateway, SDK, benchmark, an
 authors:
   - family-names: Guner
     given-names: Fatih
-repository-code: "https://github.com/hushmark/hushmark-open-core"
-url: "https://github.com/hushmark/hushmark-open-core"
+repository-code: "https://github.com/lokomotifai/hushmark-open-core"
+url: "https://github.com/lokomotifai/hushmark-open-core"
 version: 0.1.0
 date-released: 2026-08-10
 license: Apache-2.0

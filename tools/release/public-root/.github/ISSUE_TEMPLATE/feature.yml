@@ -5,7 +5,7 @@ labels: [enhancement, triage]
 body:
   - type: markdown
     attributes:
-      value: Code features belong in the canonical `hushmark/hushmark` repository; use this form for mirror-specific proposals or routing help.
+      value: Code features belong in the canonical `lokomotifai/hushmark` repository; use this form for mirror-specific proposals or routing help.
   - type: textarea
     id: problem
     attributes:

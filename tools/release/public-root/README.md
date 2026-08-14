@@ -4,9 +4,9 @@
 
 **The source-only detector, gateway, SDK, benchmark, and taxonomy release for Hushmark.**
 
-[![CI](https://img.shields.io/github/actions/workflow/status/hushmark/hushmark-open-core/ci.yml?branch=main&label=CI)](https://github.com/hushmark/hushmark-open-core/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/hushmark/hushmark-open-core?label=release)](https://github.com/hushmark/hushmark-open-core/releases/latest)
-[![License](https://img.shields.io/github/license/hushmark/hushmark-open-core)](LICENSE)
+[![CI](https://img.shields.io/github/actions/workflow/status/lokomotifai/hushmark-open-core/ci.yml?branch=main&label=CI)](https://github.com/lokomotifai/hushmark-open-core/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/lokomotifai/hushmark-open-core?label=release)](https://github.com/lokomotifai/hushmark-open-core/releases/latest)
+[![License](https://img.shields.io/github/license/lokomotifai/hushmark-open-core)](LICENSE)
 
 [English](README.md) · [Türkçe](README.tr.md) · [Security](SECURITY.md) · [Contributing](CONTRIBUTING.md)
 
@@ -24,7 +24,7 @@ masks supported values with scoped placeholders, and restores supported provider
 ## What this repository is
 
 This repository is an allowlist-generated, source-only release mirror of the public runtime in
-[`hushmark/hushmark`](https://github.com/hushmark/hushmark), the canonical development repository.
+[`lokomotifai/hushmark`](https://github.com/lokomotifai/hushmark), the canonical development repository.
 It contains no adopted model weights, private evaluation corpora, console, persistent vault, RBAC,
 audit evidence, license issuer, or deployment secrets.
 
@@ -42,7 +42,7 @@ audit evidence, license issuer, or deployment secrets.
 Prerequisites: Node.js 22, pnpm 9, Python 3.12, and uv.
 
 ```bash
-git clone https://github.com/hushmark/hushmark-open-core.git
+git clone https://github.com/lokomotifai/hushmark-open-core.git
 cd hushmark-open-core
 ./scripts/bootstrap.sh
 ./scripts/verify.sh

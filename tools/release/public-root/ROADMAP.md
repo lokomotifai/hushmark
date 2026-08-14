@@ -1,7 +1,7 @@
 # Roadmap
 
 Hushmark is an early `0.1.x` project. The canonical roadmap is maintained in
-[`hushmark/hushmark`](https://github.com/hushmark/hushmark/blob/main/ROADMAP.md).
+[`lokomotifai/hushmark`](https://github.com/lokomotifai/hushmark/blob/main/ROADMAP.md).
 
 For this source-only mirror, current priorities are:
 

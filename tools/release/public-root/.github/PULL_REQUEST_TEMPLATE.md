@@ -1,7 +1,7 @@
 ## Mirror scope
 
 - [ ] This is a mirror-specific documentation, packaging, release, or community fix.
-- [ ] A detector, gateway, SDK, benchmark, or taxonomy code change has been proposed in `hushmark/hushmark` instead.
+- [ ] A detector, gateway, SDK, benchmark, or taxonomy code change has been proposed in `lokomotifai/hushmark` instead.
 
 ## Summary
 

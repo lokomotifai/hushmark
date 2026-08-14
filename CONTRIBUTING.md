@@ -14,7 +14,7 @@ contribution under [Apache-2.0](LICENSE).
 - Never commit credentials, personal data, customer payloads, private corpora, or model weights.
 - Keep synthetic fixtures clearly synthetic and safe to publish.
 
-The full [`hushmark/hushmark`](https://github.com/hushmark/hushmark) repository is the canonical
+The full [`lokomotifai/hushmark`](https://github.com/lokomotifai/hushmark) repository is the canonical
 development history. `hushmark-open-core` is produced from an explicit allowlist; core, gateway,
 SDK, benchmark, and taxonomy code changes should therefore target this repository first.
 
@@ -23,7 +23,7 @@ SDK, benchmark, and taxonomy code changes should therefore target this repositor
 Prerequisites are Node.js 22, pnpm 9, Python 3.12, uv, and Docker for integration paths.
 
 ```bash
-git clone https://github.com/hushmark/hushmark.git
+git clone https://github.com/lokomotifai/hushmark.git
 cd hushmark
 ./scripts/bootstrap.sh
 ./scripts/verify.sh

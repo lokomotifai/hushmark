@@ -3,7 +3,7 @@
 Do not open a public issue for suspected vulnerabilities or include real personal data,
 credentials, customer payloads, or exploit details in public discussions.
 
-Use [GitHub private vulnerability reporting](https://github.com/hushmark/hushmark-open-core/security/advisories/new)
+Use [GitHub private vulnerability reporting](https://github.com/lokomotifai/hushmark-open-core/security/advisories/new)
 when available. If that channel is unavailable, email `fatih@komunite.com.tr` with the subject
 `Hushmark security report`. Include affected versions, impact, and safe reproduction steps.
 
@@ -12,7 +12,7 @@ seven business days. These are best-effort targets for a small maintainer team, 
 
 The latest `0.1.x` release is supported. `main` is the development branch; older prereleases and
 unpinned images are not supported. Fixes are developed in the canonical
-[`hushmark/hushmark`](https://github.com/hushmark/hushmark) repository and propagated to this mirror
+[`lokomotifai/hushmark`](https://github.com/lokomotifai/hushmark) repository and propagated to this mirror
 when they cross its source boundary.
 
 Good-faith research is welcome when it avoids privacy violations, disruption, social engineering,

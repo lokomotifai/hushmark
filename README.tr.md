@@ -4,10 +4,10 @@
 
 **Yapay zekâ trafiği için Türkçe odaklı kişisel veri tespiti, geri döndürülebilir maskeleme ve kontrollü geri yükleme.**
 
-[![CI](https://img.shields.io/github/actions/workflow/status/hushmark/hushmark/ci.yml?branch=main&label=CI)](https://github.com/hushmark/hushmark/actions/workflows/ci.yml)
-[![Tedarik zinciri](https://img.shields.io/github/actions/workflow/status/hushmark/hushmark/supply-chain.yml?branch=main&label=tedarik%20zinciri)](https://github.com/hushmark/hushmark/actions/workflows/supply-chain.yml)
-[![Sürüm](https://img.shields.io/github/v/release/hushmark/hushmark-open-core?label=sürüm)](https://github.com/hushmark/hushmark-open-core/releases/latest)
-[![Lisans](https://img.shields.io/github/license/hushmark/hushmark)](LICENSE)
+[![CI](https://img.shields.io/github/actions/workflow/status/lokomotifai/hushmark/ci.yml?branch=main&label=CI)](https://github.com/lokomotifai/hushmark/actions/workflows/ci.yml)
+[![Tedarik zinciri](https://img.shields.io/github/actions/workflow/status/lokomotifai/hushmark/supply-chain.yml?branch=main&label=tedarik%20zinciri)](https://github.com/lokomotifai/hushmark/actions/workflows/supply-chain.yml)
+[![Sürüm](https://img.shields.io/github/v/release/lokomotifai/hushmark-open-core?label=sürüm)](https://github.com/lokomotifai/hushmark-open-core/releases/latest)
+[![Lisans](https://img.shields.io/github/license/lokomotifai/hushmark)](LICENSE)
 
 [English](README.md) · [Türkçe](README.tr.md) · [Dokümantasyon](docs/README-dev.md) · [Güvenlik](SECURITY.md) · [Katkı](CONTRIBUTING.md)
 
@@ -43,7 +43,7 @@ self-hosted ağ geçidi üzerinden kontrollü biçimde geri yükler.
 - `bench/` ve `taxonomy/`: Tekrarlanabilir değerlendirme hattı ve kapalı v0.1 varlık taksonomisi.
 - `deploy/`: Docker Compose, Helm, üretim ön kontrolü ve air-gap paketleme.
 
-Daha küçük [hushmark-open-core](https://github.com/hushmark/hushmark-open-core) deposu; tespit
+Daha küçük [hushmark-open-core](https://github.com/lokomotifai/hushmark-open-core) deposu; tespit
 motoru, ağ geçidi, SDK’lar, benchmark ve taksonomi için yalnızca kaynak kodu içeren sürüm aynasıdır.
 Bu tam depo kanonik geliştirme geçmişidir; iki depo da Apache-2.0 ile lisanslanır.
 

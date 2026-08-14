@@ -8,10 +8,10 @@ license = "Apache-2.0"
 dependencies = ["httpx>=0.28.0"]
 
 [project.urls]
-Homepage = "https://github.com/hushmark/hushmark-open-core"
-Documentation = "https://github.com/hushmark/hushmark-open-core/tree/main/sdk-py#readme"
-Issues = "https://github.com/hushmark/hushmark-open-core/issues"
-Source = "https://github.com/hushmark/hushmark-open-core/tree/main/sdk-py"
+Homepage = "https://github.com/lokomotifai/hushmark-open-core"
+Documentation = "https://github.com/lokomotifai/hushmark-open-core/tree/main/sdk-py#readme"
+Issues = "https://github.com/lokomotifai/hushmark-open-core/issues"
+Source = "https://github.com/lokomotifai/hushmark-open-core/tree/main/sdk-py"
 
 [build-system]
 requires = ["hatchling>=1.27.0"]

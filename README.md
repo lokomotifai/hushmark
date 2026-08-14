@@ -4,10 +4,10 @@
 
 **Turkish-first PII detection, reversible masking, and controlled restoration for AI traffic.**
 
-[![CI](https://img.shields.io/github/actions/workflow/status/hushmark/hushmark/ci.yml?branch=main&label=CI)](https://github.com/hushmark/hushmark/actions/workflows/ci.yml)
-[![Supply chain](https://img.shields.io/github/actions/workflow/status/hushmark/hushmark/supply-chain.yml?branch=main&label=supply%20chain)](https://github.com/hushmark/hushmark/actions/workflows/supply-chain.yml)
-[![Release](https://img.shields.io/github/v/release/hushmark/hushmark-open-core?label=release)](https://github.com/hushmark/hushmark-open-core/releases/latest)
-[![License](https://img.shields.io/github/license/hushmark/hushmark)](LICENSE)
+[![CI](https://img.shields.io/github/actions/workflow/status/lokomotifai/hushmark/ci.yml?branch=main&label=CI)](https://github.com/lokomotifai/hushmark/actions/workflows/ci.yml)
+[![Supply chain](https://img.shields.io/github/actions/workflow/status/lokomotifai/hushmark/supply-chain.yml?branch=main&label=supply%20chain)](https://github.com/lokomotifai/hushmark/actions/workflows/supply-chain.yml)
+[![Release](https://img.shields.io/github/v/release/lokomotifai/hushmark-open-core?label=release)](https://github.com/lokomotifai/hushmark-open-core/releases/latest)
+[![License](https://img.shields.io/github/license/lokomotifai/hushmark)](LICENSE)
 
 [English](README.md) · [Türkçe](README.tr.md) · [Documentation](docs/README-dev.md) · [Security](SECURITY.md) · [Contributing](CONTRIBUTING.md)
 
@@ -43,7 +43,7 @@ self-hosted gateway.
 - `bench/` and `taxonomy/`: reproducible evaluation pipeline and the closed v0.1 entity taxonomy.
 - `deploy/`: Docker Compose, Helm, production preflight, and air-gap packaging.
 
-The smaller [hushmark-open-core](https://github.com/hushmark/hushmark-open-core) repository is a
+The smaller [hushmark-open-core](https://github.com/lokomotifai/hushmark-open-core) repository is a
 source-only release mirror for the detector, gateway, SDKs, benchmark, and taxonomy. This full
 repository is the canonical development history; both repositories are licensed under Apache-2.0.
 
