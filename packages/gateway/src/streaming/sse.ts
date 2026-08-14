@@ -1,18 +1,22 @@
 import type { ProviderAdapter, StreamField } from "../providers/types.js";
 import { isRecord } from "../providers/types.js";
-import type { VaultStore } from "../vault/memory.js";
-import { StreamingUnmasker } from "./unmasker.js";
+import { unmaskJsonDocument } from "../providers/content.js";
+import type { VaultScope, VaultStore } from "../vault/memory.js";
+import { StreamingUnmasker, type UnmaskAuthorization, unmaskText } from "./unmasker.js";
 
 interface StreamState {
   unmasker: StreamingUnmasker;
   make: (value: string) => Record<string, unknown>;
+  format: "text" | "json";
+  jsonBuffer: string;
 }
 
 export async function* transformSse(
   source: AsyncIterable<Uint8Array>,
   adapter: ProviderAdapter,
-  session: string,
+  scope: VaultScope,
   vault: VaultStore,
+  authorization: UnmaskAuthorization,
 ): AsyncGenerator<string> {
   const decoder = new TextDecoder();
   const states = new Map<string, StreamState>();
@@ -21,8 +25,16 @@ export async function* transformSse(
   const flushStates = async (): Promise<string> => {
     let output = "";
     for (const state of states.values()) {
-      const tail = await state.unmasker.finish();
-      if (tail.length > 0) output += `data: ${JSON.stringify(state.make(tail))}\n\n`;
+      if (state.format === "json") {
+        if (state.jsonBuffer.length === 0) continue;
+        const restored = await unmaskJsonDocument(state.jsonBuffer, (text) =>
+          unmaskText(text, scope, vault, authorization),
+        );
+        output += `data: ${JSON.stringify(state.make(restored))}\n\n`;
+      } else {
+        const tail = await state.unmasker.finish();
+        if (tail.length > 0) output += `data: ${JSON.stringify(state.make(tail))}\n\n`;
+      }
     }
     states.clear();
     return output;
@@ -48,8 +60,13 @@ export async function* transformSse(
     if (terminal) return (await flushStates()) + frame + separator;
     const fields = adapter.streamFields(parsed);
     for (const field of fields) {
-      const state = stateFor(field, states, session, vault);
-      field.set(await state.unmasker.push(field.text));
+      const state = stateFor(field, states, scope, vault, authorization);
+      if (state.format === "json") {
+        state.jsonBuffer += field.text;
+        field.set("");
+      } else {
+        field.set(await state.unmasker.push(field.text));
+      }
       state.make = (value) => field.make(value);
     }
     const dataPrefix = dataMatch[1] ?? "data: ";
@@ -75,14 +92,17 @@ export async function* transformSse(
 function stateFor(
   field: StreamField,
   states: Map<string, StreamState>,
-  session: string,
+  scope: VaultScope,
   vault: VaultStore,
+  authorization: UnmaskAuthorization,
 ): StreamState {
   const existing = states.get(field.key);
   if (existing !== undefined) return existing;
   const created: StreamState = {
-    unmasker: new StreamingUnmasker(session, vault),
+    unmasker: new StreamingUnmasker(scope, vault, authorization),
     make: (value: string) => field.make(value),
+    format: field.format ?? "text",
+    jsonBuffer: "",
   };
   states.set(field.key, created);
   return created;

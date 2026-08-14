@@ -1,6 +1,13 @@
 import { afterEach, expect, it } from "vitest";
 
-import { API_KEY, DEMO_TEXT, SESSION_ID, enterpriseHarness, login } from "../helpers.js";
+import {
+  API_KEY,
+  API_KEY_ID,
+  DEMO_TEXT,
+  SESSION_ID,
+  enterpriseHarness,
+  login,
+} from "../helpers.js";
 
 let close: (() => Promise<void>) | undefined;
 afterEach(async () => close?.());
@@ -16,7 +23,11 @@ it("allows operator de-mask and denies auditor de-mask", async () => {
   });
   const operator = await login(runtime, "operator@example.test");
   const auditor = await login(runtime, "auditor@example.test");
-  const payload = { session_id: SESSION_ID, placeholder: "[KISI_1]" };
+  const payload = {
+    tenant_id: API_KEY_ID,
+    session_id: SESSION_ID,
+    placeholder: "[KISI_1]",
+  };
   const allowed = await runtime.app.inject({
     method: "POST",
     url: "/admin/vault/resolve",

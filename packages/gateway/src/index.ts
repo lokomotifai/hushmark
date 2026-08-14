@@ -5,6 +5,7 @@ export * from "./mask/pipeline.js";
 export * from "./policy/static.js";
 export * from "./providers/anthropic.js";
 export * from "./providers/openai.js";
+export * from "./rateLimit.js";
 export * from "./server.js";
 export * from "./streaming/sse.js";
 export * from "./streaming/unmasker.js";

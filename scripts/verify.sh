@@ -30,6 +30,7 @@ uv run python tools/codegen/generate.py --check
 uv run python tools/codegen/claims_lint.py
 uv run python scripts/generate-docs.py --check
 
+./scripts/check-repository-safety.sh
 ./scripts/check-build-context.sh
 uv run python scripts/check-packaging.py
 

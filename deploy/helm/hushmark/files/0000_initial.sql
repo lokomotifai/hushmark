@@ -22,6 +22,13 @@ CREATE TABLE api_keys (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
+CREATE TABLE admin_sessions (
+  token_hash text PRIMARY KEY,
+  user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  expires_at timestamptz NOT NULL
+);
+CREATE INDEX admin_sessions_expiry_idx ON admin_sessions(expires_at);
+
 CREATE TABLE policies (
   id uuid PRIMARY KEY,
   name text NOT NULL,
@@ -34,7 +41,7 @@ CREATE TABLE policies (
 CREATE INDEX policies_priority_idx ON policies(priority DESC);
 
 CREATE TABLE audit_events (
-  seq bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  seq bigint PRIMARY KEY,
   ts timestamptz NOT NULL,
   kind text NOT NULL,
   actor text NOT NULL,
@@ -46,6 +53,7 @@ CREATE TABLE audit_events (
 );
 
 CREATE TABLE vault_records (
+  tenant_id text NOT NULL,
   session_id text NOT NULL,
   placeholder text NOT NULL,
   ciphertext bytea NOT NULL,
@@ -53,8 +61,10 @@ CREATE TABLE vault_records (
   tag bytea NOT NULL,
   wrapped_key text NOT NULL,
   entity_type text NOT NULL,
+  value_hmac text NOT NULL,
   expires_at timestamptz NOT NULL,
-  PRIMARY KEY (session_id, placeholder)
+  PRIMARY KEY (tenant_id, session_id, placeholder),
+  UNIQUE (tenant_id, session_id, entity_type, value_hmac)
 );
 CREATE INDEX vault_records_expiry_idx ON vault_records(expires_at);
 

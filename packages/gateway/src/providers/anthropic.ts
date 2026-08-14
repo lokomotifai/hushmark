@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { GatewayError } from "../errors.js";
 import type { TextSegment } from "../mask/pipeline.js";
-import { collectContent, unmaskContent } from "./content.js";
+import { collectContent, collectJsonStrings, unmaskContent } from "./content.js";
 import type { ParsedProviderRequest, ProviderAdapter, StreamField } from "./types.js";
 import { isRecord } from "./types.js";
 
@@ -13,8 +13,17 @@ const RequestSchema = z
     stream: z.boolean().optional().default(false),
     system: z.unknown().optional(),
     messages: z.array(z.record(z.string(), z.unknown())).min(1),
+    metadata: z.unknown().optional(),
+    service_tier: z.unknown().optional(),
+    stop_sequences: z.unknown().optional(),
+    temperature: z.unknown().optional(),
+    thinking: z.unknown().optional(),
+    tool_choice: z.unknown().optional(),
+    tools: z.unknown().optional(),
+    top_k: z.unknown().optional(),
+    top_p: z.unknown().optional(),
   })
-  .loose();
+  .strict();
 
 export class AnthropicAdapter implements ProviderAdapter {
   readonly kind = "anthropic" as const;
@@ -48,6 +57,12 @@ export class AnthropicAdapter implements ProviderAdapter {
         segments,
       );
     });
+    for (const field of ["metadata", "stop_sequences", "thinking", "tools"] as const) {
+      if (!(field in body)) continue;
+      collectJsonStrings(body[field], `request.${field}`, segments, (value) => {
+        body[field] = value;
+      });
+    }
     return { body, segments, stream: parsed.data.stream };
   }
 
@@ -74,16 +89,6 @@ export class AnthropicAdapter implements ProviderAdapter {
       },
       segments,
     );
-    for (const [index, part] of input.content.entries()) {
-      if (!isRecord(part) || part.type !== "tool_use" || !isRecord(part.input)) continue;
-      segments.push({
-        id: `response.tool.${String(index)}.input`,
-        text: JSON.stringify(part.input),
-        set: (value) => {
-          part.input = JSON.parse(value) as unknown;
-        },
-      });
-    }
     return segments;
   }
 
@@ -111,6 +116,7 @@ export class AnthropicAdapter implements ProviderAdapter {
         {
           key: `block.${String(payload.index)}.input`,
           text: delta.partial_json,
+          format: "json",
           set: (value) => {
             delta.partial_json = value;
           },

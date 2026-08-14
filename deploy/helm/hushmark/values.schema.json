@@ -43,7 +43,7 @@
     "workloadCore": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["replicaCount", "image", "model", "service", "resources", "nerBackend", "nerThreshold"],
+      "required": ["replicaCount", "image", "model", "service", "resources", "nerBackend", "nerThreshold", "bodyLimitBytes", "maxConcurrency", "queueTimeoutMs"],
       "properties": {
         "replicaCount": { "type": "integer", "minimum": 1 },
         "image": { "$ref": "#/$defs/image" },
@@ -56,13 +56,16 @@
         "service": { "$ref": "#/$defs/service" },
         "resources": { "$ref": "#/$defs/resources" },
         "nerBackend": { "enum": ["disabled", "torch", "onnx"] },
-        "nerThreshold": { "type": "number", "minimum": 0, "maximum": 1 }
+        "nerThreshold": { "type": "number", "minimum": 0, "maximum": 1 },
+        "bodyLimitBytes": { "type": "integer", "minimum": 1, "maximum": 16777216 },
+        "maxConcurrency": { "type": "integer", "minimum": 1, "maximum": 128 },
+        "queueTimeoutMs": { "type": "integer", "minimum": 1, "maximum": 30000 }
       }
     },
     "workloadGateway": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["replicaCount", "image", "service", "existingSecret", "apiKeyKey", "openaiApiKeyKey", "anthropicApiKeyKey", "openaiUpstream", "anthropicUpstream", "resources"],
+      "required": ["replicaCount", "image", "service", "existingSecret", "apiKeyKey", "openaiApiKeyKey", "anthropicApiKeyKey", "coreServiceTokenKey", "trustProxy", "unmaskLimit", "rateLimitMax", "rateLimitWindowSec", "bodyLimitBytes", "openaiUpstream", "anthropicUpstream", "resources"],
       "properties": {
         "replicaCount": { "type": "integer", "minimum": 1 },
         "image": { "$ref": "#/$defs/image" },
@@ -71,6 +74,12 @@
         "apiKeyKey": { "type": "string", "minLength": 1 },
         "openaiApiKeyKey": { "type": "string", "minLength": 1 },
         "anthropicApiKeyKey": { "type": "string", "minLength": 1 },
+        "coreServiceTokenKey": { "type": "string", "minLength": 1 },
+        "trustProxy": { "type": "boolean" },
+        "unmaskLimit": { "type": "integer", "minimum": 1, "maximum": 1000 },
+        "rateLimitMax": { "type": "integer", "minimum": 1 },
+        "rateLimitWindowSec": { "type": "integer", "minimum": 1 },
+        "bodyLimitBytes": { "type": "integer", "minimum": 1 },
         "openaiUpstream": { "type": "string", "format": "uri" },
         "anthropicUpstream": { "type": "string", "format": "uri" },
         "resources": { "$ref": "#/$defs/resources" }
@@ -91,7 +100,7 @@
     "enterprise": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["enabled", "licenseSecret", "licenseKey", "publicKeyKey", "databaseSecret", "databaseUrlKey", "adminEmail", "adminSecret", "adminPasswordKey", "kms"],
+      "required": ["enabled", "licenseSecret", "licenseKey", "publicKeyKey", "databaseSecret", "databaseUrlKey", "adminEmail", "adminSecret", "adminPasswordKey", "auditHmacSecret", "auditHmacKey", "kms"],
       "properties": {
         "enabled": { "type": "boolean" },
         "licenseSecret": { "type": "string" },
@@ -102,6 +111,8 @@
         "adminEmail": { "type": "string" },
         "adminSecret": { "type": "string" },
         "adminPasswordKey": { "type": "string" },
+        "auditHmacSecret": { "type": "string", "minLength": 1 },
+        "auditHmacKey": { "type": "string", "minLength": 1 },
         "kms": {
           "type": "object",
           "additionalProperties": false,

@@ -2,7 +2,13 @@ import { z } from "zod";
 
 import { GatewayError } from "../errors.js";
 import type { TextSegment } from "../mask/pipeline.js";
-import { collectContent, unmaskContent } from "./content.js";
+import {
+  collectContent,
+  collectJsonDocument,
+  collectJsonStrings,
+  unmaskContent,
+  unmaskJsonDocument,
+} from "./content.js";
 import type { ParsedProviderRequest, ProviderAdapter, StreamField } from "./types.js";
 import { isRecord } from "./types.js";
 
@@ -11,8 +17,44 @@ const RequestSchema = z
     model: z.string().min(1),
     stream: z.boolean().optional().default(false),
     messages: z.array(z.record(z.string(), z.unknown())).min(1),
+    frequency_penalty: z.unknown().optional(),
+    logit_bias: z.unknown().optional(),
+    logprobs: z.unknown().optional(),
+    max_completion_tokens: z.unknown().optional(),
+    max_tokens: z.unknown().optional(),
+    metadata: z.unknown().optional(),
+    modalities: z.unknown().optional(),
+    n: z.unknown().optional(),
+    parallel_tool_calls: z.unknown().optional(),
+    prediction: z.unknown().optional(),
+    presence_penalty: z.unknown().optional(),
+    reasoning_effort: z.unknown().optional(),
+    response_format: z.unknown().optional(),
+    seed: z.unknown().optional(),
+    service_tier: z.unknown().optional(),
+    stop: z.unknown().optional(),
+    store: z.unknown().optional(),
+    stream_options: z.unknown().optional(),
+    temperature: z.unknown().optional(),
+    tool_choice: z.unknown().optional(),
+    tools: z.unknown().optional(),
+    top_logprobs: z.unknown().optional(),
+    top_p: z.unknown().optional(),
+    user: z.unknown().optional(),
+    verbosity: z.unknown().optional(),
+    web_search_options: z.unknown().optional(),
   })
-  .loose();
+  .strict();
+
+const AUXILIARY_FIELDS = [
+  "metadata",
+  "prediction",
+  "response_format",
+  "stop",
+  "tools",
+  "user",
+  "web_search_options",
+] as const;
 
 export class OpenAiAdapter implements ProviderAdapter {
   readonly kind = "openai" as const;
@@ -25,17 +67,38 @@ export class OpenAiAdapter implements ProviderAdapter {
     if (!Array.isArray(messages)) throw new GatewayError("HM-4001", "malformed request");
     const segments: TextSegment[] = [];
     messages.forEach((message, index) => {
-      if (!isRecord(message) || typeof message.role !== "string" || !("content" in message)) {
+      if (!isRecord(message) || typeof message.role !== "string") {
         throw new GatewayError("HM-4001", "malformed request");
       }
-      collectContent(
-        message.content,
-        `message.${String(index)}.content`,
-        (value) => {
-          message.content = value;
-        },
-        segments,
-      );
+      if ("content" in message) {
+        collectContent(
+          message.content,
+          `message.${String(index)}.content`,
+          (value) => {
+            message.content = value;
+          },
+          segments,
+        );
+      }
+      if (Array.isArray(message.tool_calls)) {
+        message.tool_calls.forEach((toolCall, toolIndex) => {
+          if (!isRecord(toolCall) || !isRecord(toolCall.function)) {
+            throw new GatewayError("HM-4203", "unsupported tool call");
+          }
+          const functionValue = toolCall.function;
+          if (typeof functionValue.arguments !== "string") {
+            throw new GatewayError("HM-4203", "tool arguments must be valid JSON");
+          }
+          collectJsonDocument(
+            functionValue.arguments,
+            `message.${String(index)}.tool.${String(toolIndex)}`,
+            segments,
+            (value) => {
+              functionValue.arguments = value;
+            },
+          );
+        });
+      }
       if (typeof message.name === "string") {
         segments.push({
           id: `message.${String(index)}.name`,
@@ -46,6 +109,12 @@ export class OpenAiAdapter implements ProviderAdapter {
         });
       }
     });
+    for (const field of AUXILIARY_FIELDS) {
+      if (!(field in body)) continue;
+      collectJsonStrings(body[field], `request.${field}`, segments, (value) => {
+        body[field] = value;
+      });
+    }
     return { body, segments, stream: parsed.data.stream };
   }
 
@@ -69,7 +138,10 @@ export class OpenAiAdapter implements ProviderAdapter {
           if (isRecord(toolCall) && isRecord(toolCall.function)) {
             const functionValue = toolCall.function;
             if (typeof functionValue.arguments === "string") {
-              functionValue.arguments = await resolveText(functionValue.arguments);
+              functionValue.arguments = await unmaskJsonDocument(
+                functionValue.arguments,
+                resolveText,
+              );
             }
           }
         }
@@ -99,13 +171,14 @@ export class OpenAiAdapter implements ProviderAdapter {
         if (!isRecord(toolCall) || !isRecord(toolCall.function)) return;
         const functionValue = toolCall.function;
         if (typeof functionValue.arguments !== "string") return;
-        segments.push({
-          id: `response.${String(choiceIndex)}.tool.${String(toolIndex)}`,
-          text: functionValue.arguments,
-          set: (value) => {
+        collectJsonDocument(
+          functionValue.arguments,
+          `response.${String(choiceIndex)}.tool.${String(toolIndex)}`,
+          segments,
+          (value) => {
             functionValue.arguments = value;
           },
-        });
+        );
       });
     });
     return segments;
@@ -138,6 +211,7 @@ export class OpenAiAdapter implements ProviderAdapter {
         fields.push({
           key: `choice.${String(choiceIndex)}.tool.${String(toolIndex)}`,
           text: functionValue.arguments,
+          format: "json",
           set: (value) => {
             functionValue.arguments = value;
           },

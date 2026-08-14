@@ -17,6 +17,7 @@ GATEWAY_DESCRIPTIONS = {
     "HUSHMARK_GATEWAY_PORT": ("8080", "Gateway listen port."),
     "HUSHMARK_API_KEYS": ("required", "Comma-separated `hm_k1_…` client keys."),
     "HUSHMARK_CORE_URL": ("http://127.0.0.1:8000", "Private core base URL."),
+    "HUSHMARK_CORE_SERVICE_TOKEN": ("unset", "Core service-to-service bearer credential."),
     "HUSHMARK_OPENAI_UPSTREAM": ("required", "OpenAI-compatible upstream base URL."),
     "HUSHMARK_ANTHROPIC_UPSTREAM": ("required", "Anthropic-compatible upstream base URL."),
     "HUSHMARK_OPENAI_API_KEY": ("unset", "Optional upstream OpenAI bearer credential."),
@@ -24,11 +25,21 @@ GATEWAY_DESCRIPTIONS = {
     "HUSHMARK_POLICY_PATH": ("packages/gateway/policy.yaml", "Static policy file."),
     "HUSHMARK_VAULT_MAX_ENTRIES": ("100000", "Open vault LRU capacity."),
     "HUSHMARK_VAULT_TTL_SEC": ("86400", "Open vault entry TTL in seconds."),
+    "HUSHMARK_UNMASK_LIMIT": ("100", "Maximum placeholder restorations per response."),
+    "HUSHMARK_RATE_LIMIT_MAX": ("120", "Requests permitted in each gateway rate window."),
+    "HUSHMARK_RATE_LIMIT_WINDOW_SEC": ("60", "Gateway rate-limit window in seconds."),
+    "HUSHMARK_BODY_LIMIT_BYTES": ("1048576", "Maximum accepted gateway request body size."),
+    "HUSHMARK_TRUST_PROXY": ("false", "Trust the direct reverse proxy for client IP parsing."),
 }
 
 ENTERPRISE_ROWS = {
     "HUSHMARK_ADMIN_EMAIL": ("required", "Local administrator identity."),
     "HUSHMARK_ADMIN_PASSWORD": ("required", "Local administrator bootstrap password."),
+    "HUSHMARK_AUDIT_HMAC_KEY_FILE": (
+        "required",
+        "Audit-chain HMAC key file path (at least 32 bytes); also required by "
+        "`audit-verify` for protected chains.",
+    ),
     "HUSHMARK_DATABASE_URL": ("required", "PostgreSQL connection URL."),
     "HUSHMARK_KMS_KIND": ("required", "`vault`, `azure`, or `gcp`."),
     "HUSHMARK_KMS_KEY_ID": ("required", "Provider-specific wrapping key identifier."),
@@ -81,8 +92,8 @@ def declared_routes() -> set[tuple[str, str]]:
         ROOT / "packages/gateway-enterprise/src/admin/routes.ts",
     ]
     patterns = [
-        re.compile(r'@app\.(get|post|delete|patch)\("([^\"]+)"'),
-        re.compile(r'app\.(get|post|delete|patch)\("([^\"]+)"'),
+        re.compile(r'@app\.(get|post|delete|patch)\(\s*"([^\"]+)"'),
+        re.compile(r'app\.(get|post|delete|patch)\(\s*"([^\"]+)"'),
     ]
     for path in sources:
         text = path.read_text(encoding="utf-8")
@@ -169,6 +180,8 @@ def render_api() -> str:
         "",
         "All request bodies are validated. Provider routes require",
         "`Authorization: Bearer <gateway-key>`.",
+        "Core `/v1/*` routes require the configured service bearer token when core is",
+        "network-exposed.",
         "Admin routes use the local session cookie and RBAC. Error bodies use `error.code` and",
         "`error.message`; malformed input is `HM-4001`.",
         "",

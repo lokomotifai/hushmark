@@ -27,7 +27,7 @@ compose=(docker compose --env-file "$env_file" -f "$compose_file")
 "${compose[@]}" up -d --remove-orphans --wait --wait-timeout 300
 
 "${compose[@]}" exec -T core python -c \
-  'import json, urllib.request; payload=json.dumps({"items":[{"id":"smoke","text":"TCKN 10000000146"}],"language":"tr","include_values":False}).encode(); request=urllib.request.Request("http://127.0.0.1:8000/v1/mask", data=payload, headers={"content-type":"application/json"}); result=json.loads(urllib.request.urlopen(request, timeout=30).read()); assert "[TCKN_1]" in result["items"][0]["masked_text"]'
+  'import json, pathlib, urllib.request; token=pathlib.Path("/run/secrets/core_service_token").read_text().strip(); payload=json.dumps({"items":[{"id":"smoke","text":"TCKN 10000000146"}],"language":"tr","include_values":False}).encode(); request=urllib.request.Request("http://127.0.0.1:8000/v1/mask", data=payload, headers={"content-type":"application/json","authorization":f"Bearer {token}"}); result=json.loads(urllib.request.urlopen(request, timeout=30).read()); assert "[TCKN_1]" in result["items"][0]["masked_text"]'
 
 set -a
 # shellcheck disable=SC1090

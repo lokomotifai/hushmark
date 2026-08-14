@@ -25,12 +25,12 @@ self-hosted gateway.
 
 ## Why Hushmark
 
-| Without a privacy gateway                          | With Hushmark                                                       |
-| -------------------------------------------------- | ------------------------------------------------------------------- |
-| Raw identifiers can leave the application boundary | Policy runs before provider forwarding                              |
-| Masking behavior is scattered across applications  | Detection, policy, and restoration use one boundary                 |
-| Provider logs may contain direct identifiers       | Supported identifiers are replaced by scoped placeholders           |
-| Evidence is assembled after an incident            | Audit chaining and Turkish Madde 12 reports can be produced locally |
+| Without a privacy gateway                          | With Hushmark                                                                                     |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| Raw identifiers can leave the application boundary | Policy runs before provider forwarding                                                            |
+| Masking behavior is scattered across applications  | Detection, policy, and restoration use one boundary                                               |
+| Provider logs may contain direct identifiers       | Supported identifiers are replaced by scoped placeholders                                         |
+| Evidence is assembled after an incident            | The enterprise runtime can produce a local HMAC-protected audit chain and Turkish Madde 12 report |
 
 ## What is included
 
@@ -76,7 +76,8 @@ The adopted `hushmark-tr` weights are intentionally not stored in Git. Install t
 distributed, checksum-verified model under `models/hushmark-tr/` before model-backed startup.
 Bootstrap never substitutes or regenerates production weights implicitly.
 
-For a single-host production path, start with [production Compose](docs/install-compose-production.md).
+For a single-host community pilot, start with [production Compose](docs/install-compose-production.md).
+This profile is intentionally non-persistent and does not include enterprise evidence features.
 Kubernetes users can follow [Helm installation](docs/install-helm.md); disconnected environments can
 use the [air-gap guide](docs/install-airgap.md).
 

@@ -9,6 +9,7 @@ export interface ParsedProviderRequest {
 export interface StreamField {
   key: string;
   text: string;
+  format?: "text" | "json";
   set(value: string): void;
   make(value: string): Record<string, unknown>;
 }

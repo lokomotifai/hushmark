@@ -75,6 +75,28 @@ describe("createHushmark", () => {
     expect(middleware.wrapStream).toBeTypeOf("function");
   });
 
+  it("uses request-scoped sessions by default and stable sessions only when explicitly scoped", async () => {
+    const baseFetch = vi.fn<typeof fetch>().mockResolvedValue(new Response("{}"));
+    const client = createHushmark({
+      baseUrl: "http://localhost:8080",
+      apiKey: API_KEY,
+      fetch: baseFetch,
+    });
+    await client.fetch("http://localhost:8080/v1/chat/completions");
+    await client.fetch("http://localhost:8080/v1/chat/completions");
+    const first = baseFetch.mock.calls[0]?.[0];
+    const second = baseFetch.mock.calls[1]?.[0];
+    if (!(first instanceof Request) || !(second instanceof Request)) {
+      throw new Error("expected Request instances");
+    }
+    expect(first.headers.get("x-hushmark-session")).not.toBe(
+      second.headers.get("x-hushmark-session"),
+    );
+
+    const scoped = client.withSession(SESSION_ID);
+    expect(scoped.sessionId).toBe(SESSION_ID);
+  });
+
   it("preserves every AI SDK v7 stream part through wrapStream", async () => {
     const middleware = createHushmark({
       baseUrl: "http://localhost:8080",

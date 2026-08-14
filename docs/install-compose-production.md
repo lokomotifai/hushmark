@@ -1,10 +1,14 @@
-# Single-host production package
+# Single-host community production pilot
 
 Use this package for a controlled pilot on one Linux host. It deliberately avoids Kubernetes and
 does not provision cloud resources. Do not activate it until a real pilot, demo, or integration has
 an owner and an end date.
 
-The production topology contains only three containers:
+This is the **community/open-core pilot profile**. It does not provide the persistent encrypted
+vault, HMAC-protected audit chain, admin console, or Madde 12 report supplied by the enterprise
+runtime. Do not use this profile when those controls are part of the acceptance criteria.
+
+The pilot topology contains only three containers:
 
 - `core`, reachable only on an internal Docker network, with the adopted ONNX model mounted
   read-only;
@@ -26,6 +30,7 @@ Compose v2, at least 2 CPU cores and 8 GiB memory, a fully qualified domain name
 /etc/hushmark/secrets/api-keys              # mode 0600, required
 /etc/hushmark/secrets/openai-api-key        # mode 0600, may be empty
 /etc/hushmark/secrets/anthropic-api-key     # mode 0600, may be empty
+/etc/hushmark/secrets/core-service-token    # mode 0600, required; at least 32 random characters
 /srv/hushmark/models/hushmark-tr/           # immutable adopted model
 ```
 
@@ -44,7 +49,8 @@ tokenizer_config.json
 
 Clone the repository into `/opt/hushmark/repo` and check out the approved release ref. Create the host directories with root-only
 permissions, copy `deploy/docker/production.env.example` to `/etc/hushmark/production.env`, and
-replace the example domain. Store client/provider keys in the three separate secret files; never
+replace the example domain. Store client/provider keys and the core service credential in the four
+separate secret files; never
 put them in the repository or Compose environment block. Generate a client key with at least 128
 bits of randomness and the `hm_k1_` prefix.
 
@@ -76,11 +82,11 @@ Record the deployed Git commit and image digests in the pilot evidence.
 
 ## State, backup, and rollback
 
-The open-core gateway vault is in-memory and intentionally loses placeholder mappings on restart.
+The community gateway vault is in-memory and intentionally loses placeholder mappings on restart.
 The stack has no production database. Durable state is therefore limited to:
 
 - the immutable model artifact, retained offline with its checksum evidence;
-- the three secret values, retained in the operator's password manager; and
+- the four secret values, retained in the operator's password manager; and
 - Caddy certificate state, which is renewable and held in Docker named volumes.
 
 Before an update, confirm the offline model artifact and password-manager entries are recoverable.

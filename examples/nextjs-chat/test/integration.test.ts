@@ -147,6 +147,11 @@ function gatewayConfig(corePort: number, gatewayPort: number): GatewayConfig {
     HUSHMARK_POLICY_PATH: "policy.yaml",
     HUSHMARK_VAULT_MAX_ENTRIES: 100,
     HUSHMARK_VAULT_TTL_SEC: 60,
+    HUSHMARK_UNMASK_LIMIT: 100,
+    HUSHMARK_RATE_LIMIT_MAX: 120,
+    HUSHMARK_RATE_LIMIT_WINDOW_SEC: 60,
+    HUSHMARK_BODY_LIMIT_BYTES: 1_048_576,
+    HUSHMARK_TRUST_PROXY: false,
   };
 }
 

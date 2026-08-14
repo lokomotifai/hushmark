@@ -24,10 +24,6 @@
 !models/hushmark-tr/model.onnx
 !models/hushmark-tr/tokenizer.json
 !models/hushmark-tr/tokenizer_config.json
-!deploy/
-!deploy/docker/
-!deploy/docker/eval/
-!deploy/docker/eval/**
 !packages/
 !packages/shared/
 !packages/shared/**

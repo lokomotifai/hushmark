@@ -2,7 +2,8 @@ import type { FastifyInstance } from "fastify";
 import { buildServer, type ServerDependencies, type StaticPolicy } from "@hushmark/gateway";
 
 import { registerAdminRoutes } from "./admin/routes.js";
-import type { AdminSessions } from "./admin/session.js";
+import type { AdminSessionStore } from "./admin/session.js";
+import { sha256 } from "./audit/canonical.js";
 import type { IdentityRepository } from "./admin/identity.js";
 import { MemoryAuditStore, type AuditStore } from "./audit/store.js";
 import { AuditWriter, type Clock, systemClock } from "./audit/writer.js";
@@ -29,9 +30,11 @@ export interface EnterpriseServerDependencies {
   auditStore?: AuditStore;
   policyRepository?: PolicyRepository;
   vaultRepository?: VaultRepository;
-  sessions?: AdminSessions;
+  sessions?: AdminSessionStore;
   clock?: Clock;
   nowMs?: () => number;
+  auditIntegrityKey?: string | Uint8Array;
+  adminSecureCookies?: boolean;
 }
 
 export interface EnterpriseRuntime {
@@ -48,7 +51,11 @@ export async function buildEnterpriseServer(
   dependencies: EnterpriseServerDependencies,
 ): Promise<EnterpriseRuntime> {
   const auditStore = dependencies.auditStore ?? new MemoryAuditStore();
-  const audit = new AuditWriter(auditStore, dependencies.clock ?? systemClock);
+  const audit = new AuditWriter(
+    auditStore,
+    dependencies.clock ?? systemClock,
+    dependencies.auditIntegrityKey,
+  );
   const license = new LicenseGuard(
     dependencies.publicKeyPem ?? EMBEDDED_LICENSE_PUBLIC_KEY,
     dependencies.clock ?? systemClock,
@@ -77,6 +84,17 @@ export async function buildEnterpriseServer(
   );
   const app = buildServer({
     ...dependencies.gateway,
+    authenticateApiKey: (key) => dependencies.identity.authenticateApiKey(key),
+    onSecurityEvent: async (event) => {
+      await dependencies.gateway.onSecurityEvent?.(event);
+      await audit.append({
+        kind: event.kind,
+        actor: event.tenantId === undefined ? "system:gateway" : `api-key:${event.tenantId}`,
+        session_id: event.sessionId ?? null,
+        request_sha256: sha256(event.reason),
+        entities: [],
+      });
+    },
     vault,
     onMaskEvent: (event) => audit.appendMaskEvent(event).then(() => undefined),
   });
@@ -91,6 +109,9 @@ export async function buildEnterpriseServer(
     ...(dependencies.clock === undefined
       ? {}
       : { now: () => dependencies.clock?.now() ?? new Date() }),
+    ...(dependencies.adminSecureCookies === undefined
+      ? {}
+      : { secureCookies: dependencies.adminSecureCookies }),
   });
   const stopSweeper = startVaultSweeper(vault);
   app.addHook("onClose", () => stopSweeper());

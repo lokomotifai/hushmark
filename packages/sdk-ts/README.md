@@ -15,8 +15,16 @@ const hushmark = createHushmark({
 
 Use `hushmark.fetch` and `hushmark.openaiBaseUrl` with an OpenAI-compatible client, or configure an
 AI SDK provider with `hushmark.openaiBaseUrl` and wrap its model with `hushmark.middleware()`.
-The middleware adds a stable request-session header and preserves AI SDK streams while the gateway
-performs masking and restoration.
+By default, every request receives a fresh session so a singleton client cannot mix different end
+users' vault entries. Create one scoped client per end-user conversation when stable placeholder
+continuity is required:
+
+```ts
+const conversation = hushmark.withSession();
+```
+
+Never share a scoped client between end users. The middleware preserves AI SDK streams while the
+gateway performs masking and restoration.
 
 Hushmark is a technical control for supported AI traffic. Detection quality and policy outcomes
 depend on the configured engine, policy, and deployment.

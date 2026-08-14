@@ -43,6 +43,7 @@ class Hushmark:
         core_url: str,
         gateway_url: str,
         api_key: str,
+        core_service_token: str | None = None,
         timeout: float = 10.0,
         transport: httpx.BaseTransport | None = None,
     ) -> None:
@@ -51,6 +52,11 @@ class Hushmark:
         if not api_key.startswith("hm_k1_") or len(api_key) <= len("hm_k1_"):
             raise ValueError("api_key must be a non-empty hm_k1_ gateway key")
         self._api_key = api_key
+        if core_service_token is not None and len(core_service_token) < 32:
+            raise ValueError("core_service_token must contain at least 32 characters")
+        self._core_headers = (
+            {} if core_service_token is None else {"authorization": f"Bearer {core_service_token}"}
+        )
         self._client = httpx.Client(timeout=timeout, transport=transport)
 
     def analyze(
@@ -63,7 +69,9 @@ class Hushmark:
         payload: dict[str, object] = {"items": list(items), "language": language}
         if session is not None:
             payload["session"] = session
-        result = self._request_json("POST", f"{self._core_url}/v1/analyze", json=payload)
+        result = self._request_json(
+            "POST", f"{self._core_url}/v1/analyze", json=payload, headers=self._core_headers
+        )
         _validate_core_response(result, "entities")
         return cast(AnalyzeResponse, result)
 
@@ -86,7 +94,9 @@ class Hushmark:
         }
         if session is not None:
             payload["session"] = session
-        result = self._request_json("POST", f"{self._core_url}/v1/mask", json=payload)
+        result = self._request_json(
+            "POST", f"{self._core_url}/v1/mask", json=payload, headers=self._core_headers
+        )
         _validate_core_response(result, "mappings")
         return cast(MaskResponse, result)
 

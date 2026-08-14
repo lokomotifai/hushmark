@@ -58,8 +58,10 @@ services:
       dockerfile: deploy/docker/core.Dockerfile
       target: model
     environment:
+      HUSHMARK_CORE_HOST: 0.0.0.0
       HUSHMARK_CORE_NER_BACKEND: onnx
       HUSHMARK_CORE_LOG_LEVEL: info
+      HUSHMARK_CORE_SERVICE_TOKEN: hushmark-evaluation-core-service-token
     healthcheck:
       test:
         [
@@ -105,6 +107,7 @@ services:
       HUSHMARK_GATEWAY_PORT: "8080"
       HUSHMARK_API_KEYS: hm_k1_evaluation_local_key
       HUSHMARK_CORE_URL: http://core:8000
+      HUSHMARK_CORE_SERVICE_TOKEN: hushmark-evaluation-core-service-token
       HUSHMARK_OPENAI_UPSTREAM: http://fake-upstream:9000/v1
       HUSHMARK_ANTHROPIC_UPSTREAM: http://fake-upstream:9000/v1
       HUSHMARK_POLICY_PATH: /opt/hushmark/node_modules/@hushmark/gateway/policy.yaml
@@ -113,10 +116,13 @@ services:
       HUSHMARK_LICENSE_PUBLIC_KEY_FILE: /run/hushmark/license/public.pem
       HUSHMARK_KMS_KIND: vault
       HUSHMARK_KMS_KEY_ID: hushmark
+      HUSHMARK_AUDIT_HMAC_KEY_FILE: /run/hushmark/license/audit-hmac-key
       HUSHMARK_VAULT_ADDR: http://vault:8200
       HUSHMARK_VAULT_TOKEN: hushmark-evaluation-token
       HUSHMARK_ADMIN_EMAIL: admin@hushmark.local
       HUSHMARK_ADMIN_PASSWORD: hushmark-evaluation-admin
+      HUSHMARK_EVALUATION_MODE: "true"
+      HUSHMARK_ADMIN_SECURE_COOKIE: "false"
     volumes:
       - ./eval:/run/hushmark/license:ro
     ports:

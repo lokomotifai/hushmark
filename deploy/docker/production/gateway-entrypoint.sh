@@ -29,6 +29,7 @@ read_optional_secret() {
 }
 
 read_required_secret /run/secrets/hushmark_api_keys HUSHMARK_API_KEYS
+read_required_secret /run/secrets/core_service_token HUSHMARK_CORE_SERVICE_TOKEN
 read_optional_secret /run/secrets/openai_api_key HUSHMARK_OPENAI_API_KEY
 read_optional_secret /run/secrets/anthropic_api_key HUSHMARK_ANTHROPIC_API_KEY
 

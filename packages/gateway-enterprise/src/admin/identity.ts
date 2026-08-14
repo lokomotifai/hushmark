@@ -36,6 +36,7 @@ export interface IdentityRepository {
   listApiKeys(): Promise<ApiKeySummary[]>;
   putApiKey(summary: ApiKeySummary, secretHash: string): Promise<void>;
   revokeApiKey(id: string, at: string): Promise<boolean>;
+  authenticateApiKey(secret: string): Promise<string | null>;
   listProviders(): Promise<ProviderRecord[]>;
   putProvider(provider: ProviderRecord): Promise<void>;
 }
@@ -77,6 +78,17 @@ export class MemoryIdentityRepository implements IdentityRepository {
     if (record === undefined) return Promise.resolve(false);
     record.revokedAt = at;
     return Promise.resolve(true);
+  }
+
+  async authenticateApiKey(secret: string): Promise<string | null> {
+    let checkedCandidate = false;
+    for (const record of this.#apiKeys.values()) {
+      if (record.revokedAt !== null || record.prefix !== secret.slice(0, 18)) continue;
+      checkedCandidate = true;
+      if (await verifySecret(record.secretHash, secret)) return record.id;
+    }
+    if (!checkedCandidate) await verifySecret(await DUMMY_API_KEY_HASH, secret);
+    return null;
   }
 
   listProviders(): Promise<ProviderRecord[]> {
@@ -157,6 +169,20 @@ export class SqlIdentityRepository implements IdentityRepository {
     return (result.rowCount ?? 0) > 0;
   }
 
+  async authenticateApiKey(secret: string): Promise<string | null> {
+    const result = await this.sql.query<{ id: string; secret_hash: string }>(
+      `SELECT id, secret_hash FROM api_keys
+       WHERE prefix = $1 AND revoked_at IS NULL LIMIT 1`,
+      [secret.slice(0, 18)],
+    );
+    const record = result.rows[0];
+    if (record === undefined) {
+      await verifySecret(await DUMMY_API_KEY_HASH, secret);
+      return null;
+    }
+    return (await verifySecret(record.secret_hash, secret)) ? record.id : null;
+  }
+
   async listProviders(): Promise<ProviderRecord[]> {
     const result = await this.sql.query<{
       id: string;
@@ -218,3 +244,5 @@ export async function issueApiKey(
 function normalizeEmail(email: string): string {
   return z.email().parse(email).normalize("NFC").toLowerCase();
 }
+
+const DUMMY_API_KEY_HASH = hashSecret("hushmark-dummy-api-key-for-constant-work");

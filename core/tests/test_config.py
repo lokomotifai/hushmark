@@ -36,3 +36,10 @@ def test_environment_namespace(monkeypatch: object) -> None:
     assert isinstance(monkeypatch, MonkeyPatch)
     monkeypatch.setenv("HUSHMARK_CORE_PORT", "8123")
     assert Settings().port == 8123
+
+
+def test_network_exposure_requires_a_long_service_token() -> None:
+    with pytest.raises(ValidationError, match="SERVICE_TOKEN"):
+        Settings(host="0.0.0.0")
+    settings = Settings(host="0.0.0.0", service_token="x" * 32)
+    assert settings.service_token is not None

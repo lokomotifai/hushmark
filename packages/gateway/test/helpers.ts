@@ -17,6 +17,11 @@ export function testConfig(): GatewayConfig {
     HUSHMARK_POLICY_PATH: "policy.yaml",
     HUSHMARK_VAULT_MAX_ENTRIES: 100,
     HUSHMARK_VAULT_TTL_SEC: 60,
+    HUSHMARK_UNMASK_LIMIT: 100,
+    HUSHMARK_RATE_LIMIT_MAX: 120,
+    HUSHMARK_RATE_LIMIT_WINDOW_SEC: 60,
+    HUSHMARK_BODY_LIMIT_BYTES: 1_048_576,
+    HUSHMARK_TRUST_PROXY: false,
   };
 }
 
@@ -82,7 +87,7 @@ export class FakeCore implements CorePort {
         for (const definition of definitions) {
           const start = item.text.indexOf(definition.value);
           if (start < 0) continue;
-          const suffix = request.collision_mode === "prefix" ? "#abcd" : "";
+          const suffix = request.collision_mode === "prefix" ? "#abcdabcdabcdabcd" : "";
           const placeholder = definition.placeholder + suffix;
           maskedText = maskedText.split(definition.value).join(placeholder);
           mappings.push({

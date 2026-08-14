@@ -1,30 +1,26 @@
 import { randomUUID } from "node:crypto";
 
-import type {
-  FastifyInstance,
-  FastifyReply,
-  FastifyRequest,
-  HookHandlerDoneFunction,
-} from "fastify";
-import { GatewayError } from "@hushmark/gateway";
+import type { FastifyInstance, FastifyRequest } from "fastify";
+import { GatewayError, MemoryRateLimiter, type RateLimiter } from "@hushmark/gateway";
 import { z } from "zod";
 
 import { sha256 } from "../audit/canonical.js";
 import type { AuditStore } from "../audit/store.js";
 import type { AuditWriter } from "../audit/writer.js";
-import { auditNdjson, verifyAuditChain } from "../audit/verify.js";
+import { auditNdjson } from "../audit/verify.js";
 import type { LicenseGuard } from "../license/enforce.js";
 import { EnterprisePolicySchema, type CachedPolicyEvaluator } from "../policy/db.js";
 import { buildTedbirReportData, renderTedbirPdf } from "../reports/tedbir.js";
 import type { KmsEnvelopeVault } from "../vault/kmsEnvelope.js";
 import {
   issueApiKey,
+  hashSecret,
   type IdentityRepository,
   type ProviderRecord,
   verifySecret,
 } from "./identity.js";
 import { requireRole } from "./rbac.js";
-import { AdminSessions, type AdminPrincipal } from "./session.js";
+import { AdminSessions, type AdminPrincipal, type AdminSessionStore } from "./session.js";
 
 const LoginSchema = z.object({ email: z.email(), password: z.string().min(1).max(1_024) }).strict();
 const ApiKeySchema = z.object({ name: z.string().min(1).max(120) }).strict();
@@ -38,7 +34,11 @@ const ProviderSchema = z
   })
   .strict();
 const VaultResolveSchema = z
-  .object({ session_id: z.string().min(1), placeholder: z.string().min(1) })
+  .object({
+    tenant_id: z.string().min(1),
+    session_id: z.string().min(1),
+    placeholder: z.string().min(1),
+  })
   .strict();
 const AuditPageSchema = z
   .object({
@@ -67,8 +67,10 @@ export interface AdminRouteDependencies {
   audit: AuditWriter;
   vault: KmsEnvelopeVault;
   license: LicenseGuard;
-  sessions?: AdminSessions;
+  sessions?: AdminSessionStore;
   now?: () => Date;
+  rateLimiter?: RateLimiter;
+  secureCookies?: boolean;
 }
 
 export function registerAdminRoutes(
@@ -78,24 +80,18 @@ export function registerAdminRoutes(
   const sessions = dependencies.sessions ?? new AdminSessions();
   const now = dependencies.now ?? (() => new Date());
   const principals = new WeakMap<FastifyRequest, AdminPrincipal>();
+  const rateLimiter = dependencies.rateLimiter ?? new MemoryRateLimiter();
+  const secureCookie = dependencies.secureCookies ?? true;
+  const cookieSecurity = secureCookie ? "; Secure" : "";
+  const dummyPasswordHash = hashSecret(randomUUID());
 
-  const authenticate = (
-    request: FastifyRequest,
-    _reply: FastifyReply,
-    done: HookHandlerDoneFunction,
-  ): void => {
-    try {
-      const token = cookieValue(request.headers.cookie, "hm_admin");
-      const principal = token === null ? null : sessions.resolve(token);
-      if (principal === null) {
-        done(new GatewayError("HM-4010", "missing or invalid admin session"));
-        return;
-      }
-      principals.set(request, principal);
-      done();
-    } catch (error) {
-      done(error instanceof Error ? error : new Error("admin authentication failed"));
+  const authenticate = async (request: FastifyRequest): Promise<void> => {
+    const token = cookieValue(request.headers.cookie, "hm_admin");
+    const principal = token === null ? null : await sessions.resolve(token);
+    if (principal === null) {
+      throw new GatewayError("HM-4010", "missing or invalid admin session");
     }
+    principals.set(request, principal);
   };
   const principalFor = (request: FastifyRequest): AdminPrincipal => {
     const principal = principals.get(request);
@@ -108,55 +104,85 @@ export function registerAdminRoutes(
     await dependencies.license.assertMutationAllowed();
     return principal;
   };
+  const adminRoute = {
+    config: { hushmarkAuth: "admin" as const },
+    preHandler: authenticate,
+  };
 
-  app.post("/admin/auth/login", async (request, reply) => {
-    const input = LoginSchema.parse(request.body);
-    const user = await dependencies.identity.findUserByEmail(input.email);
-    if (
-      user === null ||
-      !user.enabled ||
-      !(await verifySecret(user.passwordHash, input.password))
-    ) {
+  app.post(
+    "/admin/auth/login",
+    { config: { hushmarkAuth: "public" as const } },
+    async (request, reply) => {
+      const input = LoginSchema.parse(request.body);
+      const normalizedEmail = input.email.normalize("NFC").toLowerCase();
+      const emailFingerprint = sha256(normalizedEmail);
+      const ipFingerprint = sha256(request.ip);
+      const allowedByIp = await rateLimiter.consume(`admin-login-ip:${ipFingerprint}`, 10, 60_000);
+      const allowedByAccount = await rateLimiter.consume(
+        `admin-login-account:${emailFingerprint}`,
+        5,
+        15 * 60_000,
+      );
+      if (!allowedByIp || !allowedByAccount) {
+        await dependencies.audit.append({
+          kind: "LOGIN_FAILED",
+          actor: `anonymous:${emailFingerprint.slice(0, 16)}`,
+          session_id: null,
+          request_sha256: sha256(`${ipFingerprint}\0rate-limited`),
+          entities: [],
+        });
+        throw new GatewayError("HM-4290", "admin login rate limit exceeded");
+      }
+      const user = await dependencies.identity.findUserByEmail(input.email);
+      const passwordHash = user?.enabled === true ? user.passwordHash : await dummyPasswordHash;
+      const passwordMatches = await verifySecret(passwordHash, input.password);
+      if (user === null || !user.enabled || !passwordMatches) {
+        await dependencies.audit.append({
+          kind: "LOGIN_FAILED",
+          actor: `anonymous:${emailFingerprint.slice(0, 16)}`,
+          session_id: null,
+          request_sha256: sha256(
+            `${ipFingerprint}\0${sha256(request.headers["user-agent"] ?? "unknown")}`,
+          ),
+          entities: [],
+        });
+        throw new GatewayError("HM-4010", "invalid email or password");
+      }
+      const token = await sessions.create({ userId: user.id, role: user.role });
+      reply.header(
+        "set-cookie",
+        `hm_admin=${token}; Path=/; HttpOnly${cookieSecurity}; SameSite=Strict; Max-Age=28800`,
+      );
       await dependencies.audit.append({
-        kind: "LOGIN_FAILED",
-        actor: "anonymous",
+        kind: "LOGIN_OK",
+        actor: `user:${user.id}`,
         session_id: null,
-        request_sha256: sha256("login-failed"),
+        request_sha256: sha256(user.id),
         entities: [],
       });
-      throw new GatewayError("HM-4010", "invalid email or password");
-    }
-    const token = sessions.create({ userId: user.id, role: user.role });
+      return { user: { id: user.id, email: user.email, role: user.role } };
+    },
+  );
+
+  app.post("/admin/auth/logout", adminRoute, async (request, reply) => {
+    const token = cookieValue(request.headers.cookie, "hm_admin");
+    if (token !== null) await sessions.revoke(token);
     reply.header(
       "set-cookie",
-      `hm_admin=${token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=28800`,
+      `hm_admin=; Path=/; HttpOnly${cookieSecurity}; SameSite=Strict; Max-Age=0`,
     );
-    await dependencies.audit.append({
-      kind: "LOGIN_OK",
-      actor: `user:${user.id}`,
-      session_id: null,
-      request_sha256: sha256(user.id),
-      entities: [],
-    });
-    return { user: { id: user.id, email: user.email, role: user.role } };
-  });
-
-  app.post("/admin/auth/logout", { preHandler: authenticate }, (request, reply) => {
-    const token = cookieValue(request.headers.cookie, "hm_admin");
-    if (token !== null) sessions.revoke(token);
-    reply.header("set-cookie", "hm_admin=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0");
     return { status: "ok" };
   });
 
-  app.get("/admin/policies", { preHandler: authenticate }, () => dependencies.policies.list());
-  app.post("/admin/policies", { preHandler: authenticate }, async (request) => {
+  app.get("/admin/policies", adminRoute, () => dependencies.policies.list());
+  app.post("/admin/policies", adminRoute, async (request) => {
     const principal = await mutationGuard(request);
     const policy = EnterprisePolicySchema.parse(request.body);
     await dependencies.policies.upsert(policy);
     await auditAdminChange(dependencies.audit, "POLICY_CHANGED", principal, policy.id);
     return policy;
   });
-  app.put("/admin/policies/:id", { preHandler: authenticate }, async (request) => {
+  app.put("/admin/policies/:id", adminRoute, async (request) => {
     const principal = await mutationGuard(request);
     const id = idParam(request);
     const policy = EnterprisePolicySchema.parse({
@@ -167,7 +193,7 @@ export function registerAdminRoutes(
     await auditAdminChange(dependencies.audit, "POLICY_CHANGED", principal, id);
     return policy;
   });
-  app.delete("/admin/policies/:id", { preHandler: authenticate }, async (request, reply) => {
+  app.delete("/admin/policies/:id", adminRoute, async (request, reply) => {
     const principal = await mutationGuard(request);
     const id = idParam(request);
     const deleted = await dependencies.policies.delete(id);
@@ -177,18 +203,18 @@ export function registerAdminRoutes(
     return { status: "deleted" };
   });
 
-  app.get("/admin/api-keys", { preHandler: authenticate }, (request) => {
+  app.get("/admin/api-keys", adminRoute, (request) => {
     requireRole(principalFor(request).role, ["admin"]);
     return dependencies.identity.listApiKeys();
   });
-  app.post("/admin/api-keys", { preHandler: authenticate }, async (request) => {
+  app.post("/admin/api-keys", adminRoute, async (request) => {
     const principal = await mutationGuard(request);
     const issued = await issueApiKey(ApiKeySchema.parse(request.body).name, now());
     await dependencies.identity.putApiKey(issued.summary, issued.secretHash);
     await auditAdminChange(dependencies.audit, "KEY_CREATED", principal, issued.summary.id);
     return { ...issued.summary, secret: issued.secret };
   });
-  app.delete("/admin/api-keys/:id", { preHandler: authenticate }, async (request) => {
+  app.delete("/admin/api-keys/:id", adminRoute, async (request) => {
     const principal = await mutationGuard(request);
     const id = idParam(request);
     const revoked = await dependencies.identity.revokeApiKey(id, now().toISOString());
@@ -197,10 +223,8 @@ export function registerAdminRoutes(
     return { status: "revoked" };
   });
 
-  app.get("/admin/providers", { preHandler: authenticate }, () =>
-    dependencies.identity.listProviders(),
-  );
-  app.post("/admin/providers", { preHandler: authenticate }, async (request) => {
+  app.get("/admin/providers", adminRoute, () => dependencies.identity.listProviders());
+  app.post("/admin/providers", adminRoute, async (request) => {
     const principal = await mutationGuard(request);
     const input = ProviderSchema.parse(request.body);
     const provider: ProviderRecord = {
@@ -215,19 +239,19 @@ export function registerAdminRoutes(
     return provider;
   });
 
-  app.get("/admin/audit/events", { preHandler: authenticate }, async (request) => {
+  app.get("/admin/audit/events", adminRoute, async (request) => {
     requireRole(principalFor(request).role, ["admin", "auditor"]);
     const query = AuditPageSchema.parse(request.query);
-    const events = [...(await dependencies.auditStore.list())].reverse();
     const start = (query.page - 1) * query.limit;
+    const result = await dependencies.auditStore.page(start, query.limit);
     return {
-      events: events.slice(start, start + query.limit),
+      events: result.records,
       page: query.page,
       limit: query.limit,
-      total: events.length,
+      total: result.total,
     };
   });
-  app.get("/admin/audit/export", { preHandler: authenticate }, async (request, reply) => {
+  app.get("/admin/audit/export", adminRoute, async (request, reply) => {
     const principal = principalFor(request);
     requireRole(principal.role, ["admin", "auditor"]);
     const range = AuditRangeSchema.parse(request.query);
@@ -240,33 +264,43 @@ export function registerAdminRoutes(
     reply.header("content-type", "application/x-ndjson; charset=utf-8");
     return auditNdjson(records);
   });
-  app.get("/admin/audit/verify", { preHandler: authenticate }, async (request) => {
+  app.get("/admin/audit/verify", adminRoute, async (request) => {
     requireRole(principalFor(request).role, ["admin", "auditor"]);
     const range = AuditRangeSchema.parse(request.query);
-    return verifyAuditChain(
+    return dependencies.audit.verify(
       await dependencies.auditStore.list(),
       range.from ?? 1,
       range.to ?? "latest",
     );
   });
 
-  app.post("/admin/vault/resolve", { preHandler: authenticate }, async (request) => {
+  app.post("/admin/vault/resolve", adminRoute, async (request) => {
     const principal = principalFor(request);
+    if (!(await rateLimiter.consume(`admin-vault:${principal.userId}`, 60, 60_000))) {
+      await dependencies.audit.append({
+        kind: "REQUEST_BLOCKED",
+        actor: `user:${principal.userId}`,
+        session_id: null,
+        request_sha256: sha256("admin-vault-rate-limited"),
+        entities: [],
+      });
+      throw new GatewayError("HM-4290", "vault resolution rate limit exceeded");
+    }
     const input = VaultResolveSchema.parse(request.body);
     const value = await dependencies.vault.resolveAs(
       principal.role,
       `user:${principal.userId}`,
-      input.session_id,
+      { tenantId: input.tenant_id, sessionId: input.session_id },
       input.placeholder,
     );
     return { value };
   });
 
-  app.get("/admin/license", { preHandler: authenticate }, async () => ({
+  app.get("/admin/license", adminRoute, async () => ({
     state: await dependencies.license.status(),
     license: dependencies.license.license,
   }));
-  app.put("/admin/license", { preHandler: authenticate }, async (request) => {
+  app.put("/admin/license", adminRoute, async (request) => {
     const principal = principalFor(request);
     requireRole(principal.role, ["admin"]);
     const valid = await dependencies.license.load(request.body);
@@ -274,22 +308,16 @@ export function registerAdminRoutes(
     return { state: await dependencies.license.status() };
   });
 
-  app.get("/admin/metrics/summary", { preHandler: authenticate }, async () => {
-    const events = await dependencies.auditStore.list();
-    const entityCounts: Record<string, number> = {};
-    let masked = 0;
-    let blocked = 0;
-    for (const event of events) {
-      if (event.kind === "MASK_APPLIED") masked += 1;
-      if (event.kind === "REQUEST_BLOCKED") blocked += 1;
-      event.entities.forEach((entity) => {
-        entityCounts[entity.type] = (entityCounts[entity.type] ?? 0) + entity.count;
-      });
-    }
-    return { masked, blocked, entity_counts: entityCounts };
+  app.get("/admin/metrics/summary", adminRoute, async () => {
+    const metrics = await dependencies.auditStore.metrics();
+    return {
+      masked: metrics.masked,
+      blocked: metrics.blocked,
+      entity_counts: metrics.entityCounts,
+    };
   });
 
-  app.get("/admin/reports/tedbir", { preHandler: authenticate }, async (request, reply) => {
+  app.get("/admin/reports/tedbir", adminRoute, async (request, reply) => {
     const principal = principalFor(request);
     requireRole(principal.role, ["admin", "auditor"]);
     if (!dependencies.license.has("tedbir_report")) {
@@ -302,6 +330,7 @@ export function registerAdminRoutes(
       query.from,
       query.to,
       now().toISOString(),
+      (records, from, to) => dependencies.audit.verify(records, from, to),
     );
     const pdf = await renderTedbirPdf(data);
     reply.header("content-type", "application/pdf");

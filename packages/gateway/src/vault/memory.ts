@@ -6,14 +6,19 @@ export interface VaultRecord {
   ttlSec: number;
 }
 
+export interface VaultScope {
+  tenantId: string;
+  sessionId: string;
+}
+
 export interface VaultStore {
-  put(session: string, placeholder: string, record: VaultRecord): Promise<void>;
-  resolve(session: string, placeholder: string): Promise<string | null>;
+  put(scope: VaultScope, placeholder: string, record: VaultRecord): Promise<void>;
+  resolve(scope: VaultScope, placeholder: string): Promise<string | null>;
   sweep(now: Date): Promise<number>;
 }
 
 export interface PlaceholderVault extends VaultStore {
-  intern(session: string, requested: string, record: VaultRecord): Promise<string>;
+  intern(scope: VaultScope, requested: string, record: VaultRecord): Promise<string>;
 }
 
 interface StoredRecord extends VaultRecord {
@@ -25,7 +30,7 @@ export type VaultEvent =
   | { event: "VAULT_EVICTED"; type: EntityType }
   | { event: "UNRESOLVED_PLACEHOLDER"; placeholder: string };
 
-const PLACEHOLDER_PARTS = /^\[([A-Z]{2,12})_[1-9][0-9]{0,4}\](#[0-9a-f]{4})?$/u;
+const PLACEHOLDER_PARTS = /^\[([A-Z]{2,12})_[1-9][0-9]{0,4}\](#[0-9a-f]{16})?$/u;
 
 export class MemoryVault implements PlaceholderVault {
   readonly #entries = new Map<string, StoredRecord>();
@@ -38,24 +43,24 @@ export class MemoryVault implements PlaceholderVault {
     private readonly onEvent: (event: VaultEvent) => void = () => undefined,
   ) {}
 
-  put(session: string, placeholder: string, record: VaultRecord): Promise<void> {
-    return this.intern(session, placeholder, record).then(() => undefined);
+  put(scope: VaultScope, placeholder: string, record: VaultRecord): Promise<void> {
+    return this.intern(scope, placeholder, record).then(() => undefined);
   }
 
-  intern(session: string, requested: string, record: VaultRecord): Promise<string> {
-    const reverseKey = this.reverseKey(session, record.type, record.value);
+  intern(scope: VaultScope, requested: string, record: VaultRecord): Promise<string> {
+    const reverseKey = this.reverseKey(scope, record.type, record.value);
     const existing = this.#reverse.get(reverseKey);
     if (existing !== undefined) {
-      const stored = this.#entries.get(this.entryKey(session, existing));
+      const stored = this.#entries.get(this.entryKey(scope, existing));
       if (stored !== undefined && stored.expiresAt > this.now()) {
-        this.touch(this.entryKey(session, existing), stored);
+        this.touch(this.entryKey(scope, existing), stored);
         return Promise.resolve(existing);
       }
       this.#reverse.delete(reverseKey);
     }
 
-    const placeholder = this.availablePlaceholder(session, requested, record.type);
-    const key = this.entryKey(session, placeholder);
+    const placeholder = this.availablePlaceholder(scope, requested, record.type);
+    const key = this.entryKey(scope, placeholder);
     const stored: StoredRecord = {
       ...record,
       expiresAt: this.now() + record.ttlSec * 1_000,
@@ -67,8 +72,8 @@ export class MemoryVault implements PlaceholderVault {
     return Promise.resolve(placeholder);
   }
 
-  resolve(session: string, placeholder: string): Promise<string | null> {
-    const key = this.entryKey(session, placeholder);
+  resolve(scope: VaultScope, placeholder: string): Promise<string | null> {
+    const key = this.entryKey(scope, placeholder);
     const stored = this.#entries.get(key);
     if (stored === undefined || stored.expiresAt <= this.now()) {
       if (stored !== undefined) this.deleteEntry(key, stored);
@@ -94,14 +99,14 @@ export class MemoryVault implements PlaceholderVault {
     return this.#entries.size;
   }
 
-  private availablePlaceholder(session: string, requested: string, type: EntityType): string {
+  private availablePlaceholder(scope: VaultScope, requested: string, type: EntityType): string {
     const match = PLACEHOLDER_PARTS.exec(requested);
     const label = match?.[1] ?? TAXONOMY[type].tr_label;
     const suffix = match?.[2] ?? "";
-    const counterKey = `${session}\0${label}${suffix}`;
+    const counterKey = `${scopeKey(scope)}\0${label}${suffix}`;
     let index = this.#counters.get(counterKey) ?? 0;
     let candidate = requested;
-    while (this.#entries.has(this.entryKey(session, candidate))) {
+    while (this.#entries.has(this.entryKey(scope, candidate))) {
       index += 1;
       candidate = `[${label}_${String(index)}]${suffix}`;
     }
@@ -110,12 +115,12 @@ export class MemoryVault implements PlaceholderVault {
     return candidate;
   }
 
-  private entryKey(session: string, placeholder: string): string {
-    return `${session}\0${placeholder}`;
+  private entryKey(scope: VaultScope, placeholder: string): string {
+    return `${scopeKey(scope)}\0${placeholder}`;
   }
 
-  private reverseKey(session: string, type: EntityType, value: string): string {
-    return `${session}\0${type}\0${value.normalize("NFC")}`;
+  private reverseKey(scope: VaultScope, type: EntityType, value: string): string {
+    return `${scopeKey(scope)}\0${type}\0${value.normalize("NFC")}`;
   }
 
   private touch(key: string, stored: StoredRecord): void {
@@ -136,4 +141,8 @@ export class MemoryVault implements PlaceholderVault {
       this.onEvent({ event: "VAULT_EVICTED", type: oldest[1].type });
     }
   }
+}
+
+function scopeKey(scope: VaultScope): string {
+  return `${scope.tenantId}\0${scope.sessionId}`;
 }

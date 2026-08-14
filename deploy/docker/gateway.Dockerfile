@@ -15,7 +15,6 @@ RUN pnpm install --frozen-lockfile
 COPY packages/shared packages/shared
 COPY packages/gateway packages/gateway
 COPY packages/gateway-enterprise packages/gateway-enterprise
-COPY deploy/docker/eval deploy/docker/eval
 RUN pnpm --filter @hushmark/shared build \
     && pnpm --filter @hushmark/gateway build \
     && pnpm --filter @hushmark/gateway-enterprise build \
@@ -30,7 +29,6 @@ RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack 
     && rm -f /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack /usr/local/bin/pnpm /usr/local/bin/pnpx
 WORKDIR /opt/hushmark
 COPY --from=build --chown=hushmark:hushmark /deploy ./
-COPY --from=build --chown=hushmark:hushmark /workspace/deploy/docker/eval ./eval
 ENV NODE_ENV=production
 USER hushmark:hushmark
 EXPOSE 8080

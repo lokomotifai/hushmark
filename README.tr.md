@@ -25,12 +25,12 @@ self-hosted ağ geçidi üzerinden kontrollü biçimde geri yükler.
 
 ## Neden Hushmark?
 
-| Gizlilik ağ geçidi olmadan                          | Hushmark ile                                                   |
-| --------------------------------------------------- | -------------------------------------------------------------- |
-| Ham kimlik verileri uygulama sınırından çıkabilir   | Politika, sağlayıcıya iletimden önce çalışır                   |
-| Maskeleme davranışı uygulamalara dağılır            | Tespit, politika ve geri yükleme tek sınırda yürür             |
-| Sağlayıcı kayıtları doğrudan tanımlayıcı içerebilir | Desteklenen tanımlayıcılar kapsamlı yer tutuculara çevrilir    |
-| Olay kanıtı sonradan toplanır                       | Denetim zinciri ve Türkçe Madde 12 raporu yerelde üretilebilir |
+| Gizlilik ağ geçidi olmadan                          | Hushmark ile                                                                                     |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Ham kimlik verileri uygulama sınırından çıkabilir   | Politika, sağlayıcıya iletimden önce çalışır                                                     |
+| Maskeleme davranışı uygulamalara dağılır            | Tespit, politika ve geri yükleme tek sınırda yürür                                               |
+| Sağlayıcı kayıtları doğrudan tanımlayıcı içerebilir | Desteklenen tanımlayıcılar kapsamlı yer tutuculara çevrilir                                      |
+| Olay kanıtı sonradan toplanır                       | Enterprise runtime, HMAC korumalı denetim zinciri ve Türkçe Madde 12 raporunu yerelde üretebilir |
 
 ## Depoda neler var?
 
@@ -76,7 +76,8 @@ Benimsenen `hushmark-tr` ağırlıkları bilinçli olarak Git’e konmaz. Model 
 ayrı dağıtılan ve sağlama toplamı doğrulanan modeli `models/hushmark-tr/` altına kurun. Bootstrap
 üretim modelini kendiliğinden değiştirmez veya yeniden üretmez.
 
-Tek sunuculu üretim kurulumu için [üretim Compose](docs/install-compose-production.md), Kubernetes
+Tek sunuculu community pilotu için [üretim Compose](docs/install-compose-production.md) rehberini
+kullanın; bu profil kalıcı değildir ve enterprise kanıt özelliklerini içermez. Kubernetes
 için [Helm](docs/install-helm.md), bağlantısız ortamlar için [air-gap](docs/install-airgap.md)
 rehberini kullanın.
 

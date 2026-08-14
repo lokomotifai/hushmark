@@ -88,12 +88,15 @@ for index in "${!model_files[@]}"; do
   [[ $actual_hash == "${expected_hashes[$index]}" ]] || fail "model checksum mismatch: $filename"
 done
 
-for secret_name in api-keys openai-api-key anthropic-api-key; do
+for secret_name in api-keys openai-api-key anthropic-api-key core-service-token; do
   secret_path=$HUSHMARK_SECRETS_DIR/$secret_name
   [[ -f "$secret_path" && ! -L "$secret_path" ]] || fail "secret file is missing or is a symlink: $secret_path"
   secret_mode=$(file_mode "$secret_path")
   [[ $secret_mode == 400 || $secret_mode == 600 ]] || fail "secret file mode must be 0400 or 0600: $secret_name"
 done
+
+core_service_token=$(tr -d '\r\n' <"$HUSHMARK_SECRETS_DIR/core-service-token")
+[[ ${#core_service_token} -ge 32 ]] || fail "core-service-token must contain at least 32 characters"
 
 api_keys=$(tr -d '\r\n' <"$HUSHMARK_SECRETS_DIR/api-keys")
 [[ -n $api_keys ]] || fail "api-keys is empty"

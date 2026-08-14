@@ -35,6 +35,16 @@ export async function startEnterpriseStack(): Promise<EnterpriseRuntime> {
     role: "admin",
     enabled: true,
   });
+  await identity.putApiKey(
+    {
+      id: "10000000-0000-4000-8000-000000000099",
+      name: "console-e2e",
+      prefix: API_KEY.slice(0, 18),
+      revokedAt: null,
+      createdAt: clock.now().toISOString(),
+    },
+    await hashSecret(API_KEY),
+  );
   const { privateKey, publicKey } = generateKeyPairSync("ed25519");
   const payload: UnsignedLicense = {
     v: 1,
@@ -78,6 +88,7 @@ export async function startEnterpriseStack(): Promise<EnterpriseRuntime> {
     publicKeyPem: publicKey.export({ type: "spki", format: "pem" }).toString(),
     clock,
     nowMs: () => clock.now().getTime(),
+    adminSecureCookies: false,
   });
   await runtime.app.listen({ host: "127.0.0.1", port: 31_881 });
   return runtime;
@@ -94,6 +105,11 @@ function config(): GatewayConfig {
     HUSHMARK_POLICY_PATH: "policy.yaml",
     HUSHMARK_VAULT_MAX_ENTRIES: 100,
     HUSHMARK_VAULT_TTL_SEC: 3_600,
+    HUSHMARK_UNMASK_LIMIT: 100,
+    HUSHMARK_RATE_LIMIT_MAX: 120,
+    HUSHMARK_RATE_LIMIT_WINDOW_SEC: 60,
+    HUSHMARK_BODY_LIMIT_BYTES: 1_048_576,
+    HUSHMARK_TRUST_PROXY: false,
   };
 }
 

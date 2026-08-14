@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, createHmac } from "node:crypto";
 
 import canonicalize from "canonicalize";
 
@@ -16,6 +16,12 @@ export function sha256(value: string | Uint8Array): string {
   return createHash("sha256").update(value).digest("hex");
 }
 
-export function auditHash(eventWithoutHash: Omit<AuditRecord, "hash">): string {
-  return sha256(jcs(eventWithoutHash) + eventWithoutHash.prev_hash);
+export function auditHash(
+  eventWithoutHash: Omit<AuditRecord, "hash">,
+  integrityKey?: string | Uint8Array,
+): string {
+  const canonical = jcs(eventWithoutHash) + eventWithoutHash.prev_hash;
+  return integrityKey === undefined
+    ? sha256(canonical)
+    : createHmac("sha256", integrityKey).update(canonical).digest("hex");
 }

@@ -1,5 +1,5 @@
 import {
-  bigserial,
+  bigint,
   boolean,
   customType,
   index,
@@ -63,6 +63,18 @@ export const apiKeys = pgTable(
   (table) => [uniqueIndex("api_keys_prefix_uq").on(table.prefix)],
 );
 
+export const adminSessions = pgTable(
+  "admin_sessions",
+  {
+    tokenHash: text("token_hash").primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  },
+  (table) => [index("admin_sessions_expiry_idx").on(table.expiresAt)],
+);
+
 export const policies = pgTable(
   "policies",
   {
@@ -78,7 +90,7 @@ export const policies = pgTable(
 );
 
 export const auditEvents = pgTable("audit_events", {
-  seq: bigserial("seq", { mode: "number" }).primaryKey(),
+  seq: bigint("seq", { mode: "number" }).primaryKey(),
   ts: timestamp("ts", { withTimezone: true }).notNull(),
   kind: text("kind").$type<AuditKind>().notNull(),
   actor: text("actor").notNull(),
@@ -92,6 +104,7 @@ export const auditEvents = pgTable("audit_events", {
 export const vaultRecords = pgTable(
   "vault_records",
   {
+    tenantId: text("tenant_id").notNull(),
     sessionId: text("session_id").notNull(),
     placeholder: text("placeholder").notNull(),
     ciphertext: bytea("ciphertext").notNull(),
@@ -99,10 +112,17 @@ export const vaultRecords = pgTable(
     tag: bytea("tag").notNull(),
     wrappedKey: text("wrapped_key").notNull(),
     entityType: text("entity_type").notNull(),
+    valueHmac: text("value_hmac").notNull(),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
   },
   (table) => [
-    primaryKey({ columns: [table.sessionId, table.placeholder] }),
+    primaryKey({ columns: [table.tenantId, table.sessionId, table.placeholder] }),
+    uniqueIndex("vault_records_value_hmac_uq").on(
+      table.tenantId,
+      table.sessionId,
+      table.entityType,
+      table.valueHmac,
+    ),
     index("vault_records_expiry_idx").on(table.expiresAt),
   ],
 );

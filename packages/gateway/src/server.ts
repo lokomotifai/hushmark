@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
 import { Readable } from "node:stream";
 
 import fastify, {
@@ -17,10 +17,16 @@ import { MaskPipeline, type MaskEvent } from "./mask/pipeline.js";
 import { AnthropicAdapter } from "./providers/anthropic.js";
 import { OpenAiAdapter } from "./providers/openai.js";
 import type { ProviderAdapter } from "./providers/types.js";
+import { MemoryRateLimiter, type RateLimiter } from "./rateLimit.js";
 import { transformSse } from "./streaming/sse.js";
 import { unmaskText } from "./streaming/unmasker.js";
 import { HttpUpstream, type UpstreamPort } from "./upstream.js";
-import { MemoryVault, type PlaceholderVault, type VaultStore } from "./vault/memory.js";
+import {
+  MemoryVault,
+  type PlaceholderVault,
+  type VaultScope,
+  type VaultStore,
+} from "./vault/memory.js";
 
 export interface ServerDependencies {
   config: GatewayConfig;
@@ -29,17 +35,33 @@ export interface ServerDependencies {
   upstream?: UpstreamPort;
   vault?: PlaceholderVault;
   onMaskEvent?: (event: MaskEvent) => Promise<void> | void;
+  authenticateApiKey?: (key: string) => Promise<string | null>;
+  rateLimiter?: RateLimiter;
+  onSecurityEvent?: (event: GatewaySecurityEvent) => Promise<void> | void;
   logger?: boolean;
+}
+
+export interface GatewaySecurityEvent {
+  kind: "REQUEST_BLOCKED";
+  reason: "auth-rate-limit" | "tenant-rate-limit" | "unmask-limit";
+  tenantId?: string;
+  sessionId?: string;
 }
 
 export function buildServer(dependencies: ServerDependencies): FastifyInstance {
   const app = fastify({
     logger: dependencies.logger ?? false,
     logController: new LogController({ disableRequestLogging: true }),
+    bodyLimit: dependencies.config.HUSHMARK_BODY_LIMIT_BYTES,
+    trustProxy: dependencies.config.HUSHMARK_TRUST_PROXY,
   });
   const config = dependencies.config;
-  const apiKeys = new Set(config.HUSHMARK_API_KEYS);
-  const core = dependencies.core ?? new CoreClient(config.HUSHMARK_CORE_URL);
+  const apiKeys = config.HUSHMARK_API_KEYS;
+  const tenantByRequest = new WeakMap<FastifyRequest, string>();
+  const rateLimiter = dependencies.rateLimiter ?? new MemoryRateLimiter();
+  const core =
+    dependencies.core ??
+    new CoreClient(config.HUSHMARK_CORE_URL, 2_000, config.HUSHMARK_CORE_SERVICE_TOKEN);
   const upstream = dependencies.upstream ?? new HttpUpstream(config);
   const vault =
     dependencies.vault ??
@@ -72,42 +94,81 @@ export function buildServer(dependencies: ServerDependencies): FastifyInstance {
     void reply.status(gatewayError.statusCode).send(gatewayError.body());
   });
 
-  app.addHook("onRequest", (request, _reply, done) => {
+  app.addHook("onRequest", async (request) => {
+    const authMode = (
+      request.routeOptions.config as { hushmarkAuth?: "public" | "gateway" | "admin" }
+    ).hushmarkAuth;
+    if (authMode === "public" || authMode === "admin") return;
     if (
-      request.url === "/healthz" ||
-      request.url === "/readyz" ||
-      request.url.startsWith("/admin/")
+      !(await rateLimiter.consume(
+        `gateway-auth:${request.ip}`,
+        config.HUSHMARK_RATE_LIMIT_MAX,
+        config.HUSHMARK_RATE_LIMIT_WINDOW_SEC * 1_000,
+      ))
     ) {
-      done();
-      return;
+      await dependencies.onSecurityEvent?.({
+        kind: "REQUEST_BLOCKED",
+        reason: "auth-rate-limit",
+      });
+      throw new GatewayError("HM-4290", "gateway rate limit exceeded");
     }
     const authorization = request.headers.authorization;
     const key = authorization?.startsWith("Bearer ") === true ? authorization.slice(7) : "";
-    if (!apiKeys.has(key)) {
-      done(new GatewayError("HM-4010", "missing or invalid gateway API key"));
-      return;
+    const tenantId =
+      dependencies.authenticateApiKey === undefined
+        ? apiKeys.some((candidate) => safeEqual(candidate, key))
+          ? apiKeyId(key)
+          : null
+        : await dependencies.authenticateApiKey(key);
+    if (tenantId === null) {
+      throw new GatewayError("HM-4010", "missing or invalid gateway API key");
     }
-    done();
+    if (
+      !(await rateLimiter.consume(
+        `gateway-tenant:${tenantId}`,
+        config.HUSHMARK_RATE_LIMIT_MAX,
+        config.HUSHMARK_RATE_LIMIT_WINDOW_SEC * 1_000,
+      ))
+    ) {
+      await dependencies.onSecurityEvent?.({
+        kind: "REQUEST_BLOCKED",
+        reason: "tenant-rate-limit",
+        tenantId,
+      });
+      throw new GatewayError("HM-4290", "gateway rate limit exceeded");
+    }
+    tenantByRequest.set(request, tenantId);
   });
 
-  app.get("/healthz", () => ({ status: "ok" }));
-  app.get("/readyz", async (_request, reply) => {
+  app.get("/healthz", { config: { hushmarkAuth: "public" } }, () => ({ status: "ok" }));
+  app.get("/readyz", { config: { hushmarkAuth: "public" } }, async (_request, reply) => {
     const ready = (await core.ready?.()) ?? true;
     void reply.status(ready ? 200 : 503);
     return { status: ready ? "ready" : "loading" };
   });
-  app.post("/v1/chat/completions", async (request, reply) =>
-    handleProvider(
-      request,
-      reply,
-      new OpenAiAdapter(),
-      pipeline,
-      upstream,
-      vault,
-      dependencies.policy,
-    ),
+  const tenantFor = (request: FastifyRequest): string => {
+    const tenantId = tenantByRequest.get(request);
+    if (tenantId === undefined) throw new GatewayError("HM-4010", "missing gateway identity");
+    return tenantId;
+  };
+  app.post(
+    "/v1/chat/completions",
+    { config: { hushmarkAuth: "gateway" } },
+    async (request, reply) =>
+      handleProvider(
+        request,
+        reply,
+        new OpenAiAdapter(),
+        pipeline,
+        upstream,
+        vault,
+        dependencies.policy,
+        tenantFor(request),
+        config.HUSHMARK_UNMASK_LIMIT,
+        dependencies.onSecurityEvent,
+      ),
   );
-  app.post("/v1/messages", async (request, reply) =>
+  app.post("/v1/messages", { config: { hushmarkAuth: "gateway" } }, async (request, reply) =>
     handleProvider(
       request,
       reply,
@@ -116,6 +177,9 @@ export function buildServer(dependencies: ServerDependencies): FastifyInstance {
       upstream,
       vault,
       dependencies.policy,
+      tenantFor(request),
+      config.HUSHMARK_UNMASK_LIMIT,
+      dependencies.onSecurityEvent,
     ),
   );
   app.setNotFoundHandler(() => {
@@ -136,13 +200,29 @@ async function handleProvider(
   upstream: UpstreamPort,
   vault: VaultStore,
   policy: StaticPolicy,
+  tenantId: string,
+  unmaskLimit: number,
+  onSecurityEvent?: (event: GatewaySecurityEvent) => Promise<void> | void,
 ): Promise<unknown> {
   const parsed = adapter.parseRequest(request.body);
   if (parsed.stream && policy.defaults.response_scan === "buffered") {
     throw new GatewayError("HM-4203", "buffered response scan is incompatible with streaming");
   }
   const session = parseSession(request.headers["x-hushmark-session"]);
-  await pipeline.apply(parsed.segments, session);
+  const scope: VaultScope = { tenantId, sessionId: session };
+  const application = await pipeline.apply(parsed.segments, scope);
+  const authorization = {
+    allowedPlaceholders: application.issuedPlaceholders,
+    remaining: unmaskLimit,
+    limitReported: false,
+    onLimitExceeded: () =>
+      onSecurityEvent?.({
+        kind: "REQUEST_BLOCKED",
+        reason: "unmask-limit",
+        tenantId,
+        sessionId: session,
+      }),
+  };
   const abortController = new AbortController();
   request.raw.once("close", () => abortController.abort());
   const response = await upstream.forward(
@@ -154,16 +234,31 @@ async function handleProvider(
   if (parsed.stream) {
     reply.header("content-type", "text/event-stream; charset=utf-8");
     reply.header("cache-control", "no-cache");
-    return reply.send(Readable.from(transformSse(response.body, adapter, session, vault)));
+    return reply.send(
+      Readable.from(transformSse(response.body, adapter, scope, vault, authorization)),
+    );
   }
   const upstreamBody = await response.body.json();
   const restored = await adapter.unmaskResponse(upstreamBody, (text) =>
-    unmaskText(text, session, vault),
+    unmaskText(text, scope, vault, authorization),
   );
   if (policy.defaults.response_scan === "buffered") {
-    await pipeline.apply(adapter.responseSegments(restored), session);
+    await pipeline.apply(adapter.responseSegments(restored), scope);
   }
   return restored;
+}
+
+function apiKeyId(key: string): string {
+  return createHash("sha256").update(key).digest("hex");
+}
+
+function safeEqual(expected: string, supplied: string): boolean {
+  const left = Buffer.from(expected);
+  const suppliedBytes = Buffer.from(supplied);
+  const right = Buffer.alloc(left.length);
+  suppliedBytes.copy(right, 0, 0, left.length);
+  const equal = timingSafeEqual(left, right);
+  return suppliedBytes.length === left.length && equal;
 }
 
 function parseSession(value: string | string[] | undefined): string {

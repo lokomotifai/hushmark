@@ -50,6 +50,18 @@ spec:
               value: {{ .Values.gateway.service.port | quote }}
             - name: HUSHMARK_CORE_URL
               value: {{ printf "http://%s-core:%v" (include "hushmark.fullname" .) .Values.core.service.port | quote }}
+            - name: HUSHMARK_CORE_SERVICE_TOKEN
+              valueFrom: { secretKeyRef: { name: {{ .Values.gateway.existingSecret }}, key: {{ .Values.gateway.coreServiceTokenKey }} } }
+            - name: HUSHMARK_TRUST_PROXY
+              value: {{ .Values.gateway.trustProxy | quote }}
+            - name: HUSHMARK_UNMASK_LIMIT
+              value: {{ .Values.gateway.unmaskLimit | quote }}
+            - name: HUSHMARK_RATE_LIMIT_MAX
+              value: {{ .Values.gateway.rateLimitMax | quote }}
+            - name: HUSHMARK_RATE_LIMIT_WINDOW_SEC
+              value: {{ .Values.gateway.rateLimitWindowSec | quote }}
+            - name: HUSHMARK_BODY_LIMIT_BYTES
+              value: {{ .Values.gateway.bodyLimitBytes | quote }}
             - name: HUSHMARK_POLICY_PATH
               value: /etc/hushmark/policy.yaml
             - name: HUSHMARK_OPENAI_UPSTREAM
@@ -77,6 +89,8 @@ spec:
               value: {{ .Values.enterprise.kms.kind | quote }}
             - name: HUSHMARK_KMS_KEY_ID
               value: {{ .Values.enterprise.kms.keyId | quote }}
+            - name: HUSHMARK_AUDIT_HMAC_KEY_FILE
+              value: /run/hushmark/audit/{{ .Values.enterprise.auditHmacKey }}
             {{- if eq .Values.enterprise.kms.kind "vault" }}
             - name: HUSHMARK_VAULT_ADDR
               value: {{ .Values.enterprise.kms.vaultAddress | quote }}
@@ -102,6 +116,7 @@ spec:
             - { name: policy, mountPath: /etc/hushmark, readOnly: true }
             {{- if .Values.enterprise.enabled }}
             - { name: license, mountPath: /run/hushmark/license, readOnly: true }
+            - { name: audit-integrity, mountPath: /run/hushmark/audit, readOnly: true }
             {{- end }}
       volumes:
         - name: tmp
@@ -111,6 +126,8 @@ spec:
         {{- if .Values.enterprise.enabled }}
         - name: license
           secret: { secretName: {{ .Values.enterprise.licenseSecret }} }
+        - name: audit-integrity
+          secret: { secretName: {{ .Values.enterprise.auditHmacSecret }} }
         {{- end }}
 ---
 apiVersion: v1

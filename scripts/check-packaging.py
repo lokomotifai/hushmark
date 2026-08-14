@@ -57,6 +57,8 @@ def check_dockerfiles() -> None:
     assert "model_quantized.onnx" not in airgap_core
     console = (DOCKER_DIR / "console.Dockerfile").read_text(encoding="utf-8")
     assert ".next/standalone" in console
+    gateway = (DOCKER_DIR / "gateway.Dockerfile").read_text(encoding="utf-8")
+    assert "deploy/docker/eval" not in gateway
 
 
 def check_compose() -> None:
@@ -110,15 +112,21 @@ def check_production_compose() -> None:
     assert "HUSHMARK_API_KEYS" not in gateway_environment
     assert "HUSHMARK_OPENAI_API_KEY" not in gateway_environment
     assert "HUSHMARK_ANTHROPIC_API_KEY" not in gateway_environment
+    assert gateway_environment["HUSHMARK_TRUST_PROXY"] == "${HUSHMARK_TRUST_PROXY:-true}"
+    assert gateway_environment["HUSHMARK_BODY_LIMIT_BYTES"] == (
+        "${HUSHMARK_BODY_LIMIT_BYTES:-1048576}"
+    )
     assert services["gateway"]["secrets"] == [
         "hushmark_api_keys",
         "openai_api_key",
         "anthropic_api_key",
+        "core_service_token",
     ]
     assert set(compose["secrets"]) == {
         "hushmark_api_keys",
         "openai_api_key",
         "anthropic_api_key",
+        "core_service_token",
     }
 
     assert "fake-upstream" not in content
@@ -174,6 +182,7 @@ def check_chart() -> None:
     source = (ROOT / "packages/gateway-enterprise/drizzle/0000_initial.sql").read_bytes()
     packaged = (CHART_DIR / "files/0000_initial.sql").read_bytes()
     assert source == packaged, "Helm PostgreSQL migration drifted from gateway-enterprise"
+    assert (ROOT / "packages/gateway-enterprise/drizzle/0001_security_hardening.sql").is_file()
     rendered_sources = "\n".join(
         path.read_text(encoding="utf-8") for path in (CHART_DIR / "templates").glob("*.yaml")
     )

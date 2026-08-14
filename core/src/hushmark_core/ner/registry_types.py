@@ -11,6 +11,9 @@ class ModelSpecLike(Protocol):
     def sha256(self) -> str: ...
 
     @property
+    def size(self) -> int: ...
+
+    @property
     def labels(self) -> dict[str, str]: ...
 
     @property

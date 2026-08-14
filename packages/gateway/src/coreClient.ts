@@ -16,6 +16,7 @@ export class CoreClient implements CorePort {
   constructor(
     baseUrl: string,
     private readonly timeoutMs = 2_000,
+    private readonly serviceToken?: string,
   ) {
     const url = new URL("/v1/mask", baseUrl);
     this.#pool = new Pool(url.origin, { connections: 10, pipelining: 1 });
@@ -27,7 +28,12 @@ export class CoreClient implements CorePort {
       const response = await this.#pool.request({
         path: this.#path,
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: {
+          "content-type": "application/json",
+          ...(this.serviceToken === undefined
+            ? {}
+            : { authorization: `Bearer ${this.serviceToken}` }),
+        },
         body: JSON.stringify(request),
         headersTimeout: this.timeoutMs,
         bodyTimeout: this.timeoutMs,

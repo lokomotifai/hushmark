@@ -10,6 +10,15 @@ permissions:
   contents: read
 
 jobs:
+  repository-safety:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: ./scripts/check-repository-safety.sh
+      - uses: gitleaks/gitleaks-action@v2
+
   node:
     runs-on: ubuntu-latest
     steps:

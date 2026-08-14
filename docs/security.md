@@ -6,7 +6,7 @@ masking preserves utility but keeps a protected mapping capable of restoring the
 ## Trust boundaries
 
 1. Client → gateway: authenticated request boundary; untrusted request shape and text.
-2. Gateway → core: private detection boundary; core is not externally exposed.
+2. Gateway → core: service-token-authenticated private detection boundary; core is not externally exposed.
 3. Gateway → provider: only policy-processed request fields cross this egress boundary.
 4. Gateway → vault/KMS/database: enterprise custody and evidence boundary.
 5. Operator → admin API/console: authenticated RBAC boundary.
@@ -14,14 +14,14 @@ masking preserves utility but keeps a protected mapping capable of restoring the
 
 ## STRIDE analysis
 
-| Threat                 | Representative risk                                   | Implemented controls                                                                                                   | Residual risk                                                                                     |
-| ---------------------- | ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| Spoofing               | Stolen gateway or admin credential                    | Bearer-key validation, argon2id local admin auth, RBAC, secret-backed Helm config                                      | Credential lifecycle and enterprise SSO operations remain deployment responsibilities             |
-| Tampering              | Policy, audit, image, or license modification         | Strict schemas, SHA-256/JCS audit chain, ed25519 license, digest pins, keyless Cosign signatures and SBOM attestations | Audit-anchor custody and customer verification policy remain deployment responsibilities          |
-| Repudiation            | Operator denies de-mask/export action                 | Role-bound audit events, sequence and previous-hash linkage, verify CLI                                                | Host administrators can affect local storage; export anchors externally                           |
-| Information disclosure | Raw values reach provider, logs, image, or mirror     | Mask-before-forward, fail-closed core boundary, no-body logging tests, KMS envelope vault, allowlist/canary scans      | Detection false negatives, authorized de-mask, memory access, and buffered-response limits remain |
-| Denial of service      | Core/model/upstream unavailable or oversized traffic  | Health/readiness, timeouts, bounded TTL/LRU vault, Kubernetes resources, 503 fail-closed behavior                      | Capacity planning and provider availability are external                                          |
-| Elevation of privilege | Auditor resolves values or workload gains host rights | Explicit RBAC tests, non-root containers, dropped capabilities, read-only filesystems, no service-account token        | Cluster and cloud IAM configuration remains customer-controlled                                   |
+| Threat                 | Representative risk                                   | Implemented controls                                                                                                                                           | Residual risk                                                                                     |
+| ---------------------- | ----------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| Spoofing               | Stolen gateway or admin credential                    | Bearer-key validation, argon2id local admin auth, RBAC, secret-backed Helm config                                                                              | Credential lifecycle and enterprise SSO operations remain deployment responsibilities             |
+| Tampering              | Policy, audit, image, or license modification         | Strict schemas, HMAC-SHA-256/JCS audit chain, runtime model digest verification, ed25519 license, digest pins, keyless Cosign signatures and SBOM attestations | External audit-anchor custody and customer verification policy remain deployment responsibilities |
+| Repudiation            | Operator denies de-mask/export action                 | Role-bound audit events, sequence and previous-hash linkage, verify CLI                                                                                        | Host administrators can affect local storage; export anchors externally                           |
+| Information disclosure | Raw values reach provider, logs, image, or mirror     | Mask-before-forward, fail-closed core boundary, no-body logging tests, KMS envelope vault, allowlist/canary scans                                              | Detection false negatives, authorized de-mask, memory access, and buffered-response limits remain |
+| Denial of service      | Core/model/upstream unavailable or oversized traffic  | Rate limits, body/concurrency limits, health/readiness, timeouts, bounded TTL/LRU vault, Kubernetes resources, fail-closed behavior                            | Capacity planning and provider availability are external                                          |
+| Elevation of privilege | Auditor resolves values or workload gains host rights | Explicit RBAC tests, non-root containers, dropped capabilities, read-only filesystems, no service-account token                                                | Cluster and cloud IAM configuration remains customer-controlled                                   |
 
 ## Non-goals
 
