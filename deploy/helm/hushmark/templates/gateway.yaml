@@ -61,7 +61,7 @@ spec:
             - name: HUSHMARK_RATE_LIMIT_WINDOW_SEC
               value: {{ .Values.gateway.rateLimitWindowSec | quote }}
             - name: HUSHMARK_BODY_LIMIT_BYTES
-              value: {{ .Values.gateway.bodyLimitBytes | quote }}
+              value: {{ printf "%.0f" .Values.gateway.bodyLimitBytes | quote }}
             - name: HUSHMARK_POLICY_PATH
               value: /etc/hushmark/policy.yaml
             - name: HUSHMARK_OPENAI_UPSTREAM
@@ -75,6 +75,8 @@ spec:
             - name: HUSHMARK_ANTHROPIC_API_KEY
               valueFrom: { secretKeyRef: { name: {{ .Values.gateway.existingSecret }}, key: {{ .Values.gateway.anthropicApiKeyKey }}, optional: true } }
             {{- if .Values.enterprise.enabled }}
+            - name: HUSHMARK_EVALUATION_MODE
+              value: {{ .Values.enterprise.evaluationMode | quote }}
             - name: HUSHMARK_DATABASE_URL
               valueFrom: { secretKeyRef: { name: {{ .Values.enterprise.databaseSecret }}, key: {{ .Values.enterprise.databaseUrlKey }} } }
             - name: HUSHMARK_LICENSE_FILE

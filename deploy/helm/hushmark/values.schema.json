@@ -100,9 +100,10 @@
     "enterprise": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["enabled", "licenseSecret", "licenseKey", "publicKeyKey", "databaseSecret", "databaseUrlKey", "adminEmail", "adminSecret", "adminPasswordKey", "auditHmacSecret", "auditHmacKey", "kms"],
+      "required": ["enabled", "evaluationMode", "licenseSecret", "licenseKey", "publicKeyKey", "databaseSecret", "databaseUrlKey", "adminEmail", "adminSecret", "adminPasswordKey", "auditHmacSecret", "auditHmacKey", "kms"],
       "properties": {
         "enabled": { "type": "boolean" },
+        "evaluationMode": { "type": "boolean" },
         "licenseSecret": { "type": "string" },
         "licenseKey": { "type": "string" },
         "publicKeyKey": { "type": "string" },

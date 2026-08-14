@@ -8,6 +8,14 @@ tests:
           path: spec.template.spec.securityContext.runAsNonRoot
           value: true
         documentIndex: 0
+  - it: renders byte limits as decimal integers
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: HUSHMARK_BODY_LIMIT_BYTES
+            value: "1048576"
+        documentIndex: 0
       - equal:
           path: spec.template.spec.containers[0].securityContext.readOnlyRootFilesystem
           value: true
@@ -19,4 +27,21 @@ tests:
       - equal:
           path: spec.template.spec.containers[0].args[0]
           value: dist/cli.js
+        documentIndex: 0
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: HUSHMARK_EVALUATION_MODE
+            value: "false"
+        documentIndex: 0
+  - it: enables evaluation artifacts only when explicitly requested
+    set:
+      enterprise.enabled: true
+      enterprise.evaluationMode: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: HUSHMARK_EVALUATION_MODE
+            value: "true"
         documentIndex: 0

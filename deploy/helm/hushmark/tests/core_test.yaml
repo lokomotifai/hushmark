@@ -18,6 +18,14 @@ tests:
           path: spec.type
           value: ClusterIP
         documentIndex: 1
+  - it: renders byte limits as decimal integers
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: HUSHMARK_CORE_BODY_LIMIT_BYTES
+            value: "1048576"
+        documentIndex: 0
   - it: renders digest references when supplied
     set:
       core.image.digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa

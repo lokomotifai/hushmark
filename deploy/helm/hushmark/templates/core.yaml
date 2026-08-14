@@ -47,7 +47,7 @@ spec:
             - name: HUSHMARK_CORE_NER_THRESHOLD
               value: {{ .Values.core.nerThreshold | quote }}
             - name: HUSHMARK_CORE_BODY_LIMIT_BYTES
-              value: {{ .Values.core.bodyLimitBytes | quote }}
+              value: {{ printf "%.0f" .Values.core.bodyLimitBytes | quote }}
             - name: HUSHMARK_CORE_MAX_CONCURRENCY
               value: {{ .Values.core.maxConcurrency | quote }}
             - name: HUSHMARK_CORE_QUEUE_TIMEOUT_MS

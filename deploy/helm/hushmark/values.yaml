@@ -78,6 +78,7 @@ console:
 
 enterprise:
   enabled: false
+  evaluationMode: false
   licenseSecret: hushmark-license
   licenseKey: license.json
   publicKeyKey: public.pem
