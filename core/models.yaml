@@ -75,6 +75,50 @@ models:
       CRIMINAL: criminal record
       BIOMETRIC_REF: biometric data
       UNION: trade union membership
+  - id: lfm2.5-encoder-350m-pii
+    source: LiquidAI/LFM2.5-Encoder-350M-PII-Detector
+    revision: b8c9cf3d2d6ae52501b35a27ba46f271449c9ce2
+    license: lfm1.0
+    distribution: remote
+    optional: true
+    architecture: token-classification
+    weight_file: model.safetensors
+    files:
+      - path: config.json
+        size: 12497
+        sha256: ced1b2917ec78c766b309233a38dd3351b6bd1cb4ba22c18363ce47c190679ac
+      - path: model.safetensors
+        size: 1418613184
+        sha256: fbfec8b59db250a1d35b4ddc0d73571777f7088946ee22a5d7962e37c02ea6a8
+      - path: modeling_phase2_tc.py
+        size: 6554
+        sha256: e48f084a44f25a43389a153dba6c94d53cb8f8fa4afd9f95b36ea697bf24d863
+      - path: tokenizer.json
+        size: 4733371
+        sha256: 1efc3a6609abf6b63b1f47188d139f3b59973a6a434dffe970a7261a51ed2711
+      - path: tokenizer_config.json
+        size: 616
+        sha256: 2892f908f7cc397e412a92be1526234079542d139b3c2bc7e1b06921b6f55cd0
+    labels:
+      PERSON:
+        - identity.person_name
+      ADDRESS:
+        - contact.address
+      ORG:
+        - org.company_name
+      DOB:
+        - identity.date_of_birth
+      HEALTH:
+        - healthcare.condition
+        - healthcare.medication
+        - healthcare.medical_record
+        - special.health_status
+      RELIGION:
+        - special.religion
+      POLITICAL:
+        - special.political
+      SEXUAL_LIFE:
+        - special.orientation
   - id: mdeberta-v3-base
     source: microsoft/mdeberta-v3-base
     revision: a0484667b22365f84929a935b5e50a51f71f159d

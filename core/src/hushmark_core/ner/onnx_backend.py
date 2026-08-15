@@ -41,7 +41,7 @@ class OnnxNerBackend:
         self._spec = spec
         self._onnx_model_file = onnx_model_file
         self._model: OnnxPredictingModel | None = None
-        self._label_to_type = {label: entity_type for entity_type, label in spec.labels.items()}
+        self._label_to_type = dict(spec.label_to_type)
 
     @property
     def model_id(self) -> str:
@@ -54,18 +54,23 @@ class OnnxNerBackend:
     def load(self) -> None:
         if self._model is not None:
             return
+        pinned_onnx_file = self._spec.onnx_file
+        pinned_onnx_size = self._spec.onnx_size
+        pinned_onnx_sha256 = self._spec.onnx_sha256
+        if pinned_onnx_file is None or pinned_onnx_size is None or pinned_onnx_sha256 is None:
+            raise OnnxUnsupported(f"model {self._spec.id} has no pinned ONNX export")
         model_file = self._model_dir / self._onnx_model_file
         if not model_file.is_file():
             raise OnnxUnsupported(
                 f"verified ONNX export is absent for {self._spec.id}: {model_file}"
             )
-        if self._onnx_model_file != self._spec.onnx_file:
+        if self._onnx_model_file != pinned_onnx_file:
             raise OnnxUnsupported("configured ONNX filename does not match the pinned registry")
-        if model_file.stat().st_size != self._spec.onnx_size:
+        if model_file.stat().st_size != pinned_onnx_size:
             raise OnnxUnsupported(f"ONNX size verification failed: {model_file}")
         with model_file.open("rb") as model_stream:
             digest = file_digest(model_stream, "sha256").hexdigest()
-        if digest != self._spec.onnx_sha256:
+        if digest != pinned_onnx_sha256:
             raise OnnxUnsupported(f"ONNX SHA-256 verification failed: {model_file}")
         verify_runtime_artifacts(self._model_dir, self._spec)
         gliner_module = importlib.import_module("gliner")

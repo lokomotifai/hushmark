@@ -46,6 +46,11 @@ def test_health_readiness_and_metadata() -> None:
         metadata = client.get("/v1/metadata").json()
     assert metadata["model_id"] == "deterministic-v1"
     assert metadata["backends"] == ["torch", "onnx"]
+    available = {model["id"]: model for model in metadata["available_models"]}
+    assert set(available) == {"hushmark-tr", "gliner_multi_pii-v1", "lfm2.5-encoder-350m-pii"}
+    assert available["hushmark-tr"]["backends"] == ["torch", "onnx"]
+    assert available["lfm2.5-encoder-350m-pii"]["architecture"] == "token-classification"
+    assert available["lfm2.5-encoder-350m-pii"]["backends"] == ["torch"]
 
 
 def test_core_service_token_protects_value_bearing_routes(monkeypatch) -> None:

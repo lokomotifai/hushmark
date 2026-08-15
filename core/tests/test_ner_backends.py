@@ -4,12 +4,14 @@ from pathlib import Path
 
 import pytest
 from hushmark_core.ner.decode import decode_predictions
+from hushmark_core.ner.hf_token_classification import HfTokenClassificationBackend
 from hushmark_core.ner.integrity import verify_runtime_artifacts
 from hushmark_core.ner.onnx_backend import OnnxNerBackend, OnnxUnsupported
-from hushmark_core.ner.registry import load_model_spec
+from hushmark_core.ner.registry import create_backend, list_available_models, load_model_spec
 from hushmark_core.ner.torch_backend import TorchNerBackend
 
 ROOT = Path(__file__).resolve().parents[2]
+REGISTRY = ROOT / "core" / "models.yaml"
 
 
 def test_registry_pins_adopted_hushmark_tr_artifacts() -> None:
@@ -17,7 +19,10 @@ def test_registry_pins_adopted_hushmark_tr_artifacts() -> None:
     assert spec.distribution == "local-artifact"
     assert spec.revision == "a8f8bc87fdd4d4a92898513fd87eed9e7ccd2b6603ef1d1d5ce152e49192b6c2"
     assert spec.sha256 == "a8f8bc87fdd4d4a92898513fd87eed9e7ccd2b6603ef1d1d5ce152e49192b6c2"
-    assert spec.labels["PERSON"] == "person"
+    assert spec.architecture == "gliner"
+    assert spec.weight_file == "pytorch_model.bin"
+    assert spec.labels["PERSON"] == ("person",)
+    assert spec.label_to_type["person"] == "PERSON"
     assert spec.onnx_confidence_scale == pytest.approx(0.4 / 0.55)
     assert spec.onnx_file == "model.onnx"
     assert spec.onnx_size == 1157113250
@@ -34,11 +39,79 @@ def test_registry_pins_model_revision_hash_and_closed_labels() -> None:
     assert spec.distribution == "remote"
     assert spec.revision == "1fcf13e85f4eef5394e1fcd406cf2ca9ea82351d"
     assert spec.sha256 == "3003753fba99e40645cf088c7367a2c6211fc174897dc64f1f9c147c29d18d2d"
-    assert spec.labels["PERSON"] == "person"
+    assert spec.labels["PERSON"] == ("person",)
     assert spec.onnx_confidence_scale == 0.5
     assert spec.onnx_file == "model_quantized.onnx"
     assert spec.onnx_size == 349099560
     assert spec.onnx_sha256 == "2c790b5ce622fe79225da1d4e0b1e00f7d5135229d0f8a010a0050d08529aa91"
+
+
+def test_registry_pins_lfm_token_classification_model() -> None:
+    spec = load_model_spec(REGISTRY, "lfm2.5-encoder-350m-pii")
+    assert spec.distribution == "remote"
+    assert spec.architecture == "token-classification"
+    assert spec.weight_file == "model.safetensors"
+    assert spec.revision == "b8c9cf3d2d6ae52501b35a27ba46f271449c9ce2"
+    assert spec.sha256 == "fbfec8b59db250a1d35b4ddc0d73571777f7088946ee22a5d7962e37c02ea6a8"
+    assert spec.onnx_file is None
+    assert spec.onnx_confidence_scale == 1.0
+    assert spec.label_to_type["healthcare.condition"] == "HEALTH"
+    assert spec.label_to_type["special.health_status"] == "HEALTH"
+    assert spec.label_to_type["special.orientation"] == "SEXUAL_LIFE"
+    for absent_type in ("ETHNICITY", "CRIMINAL", "BIOMETRIC_REF", "UNION"):
+        assert absent_type not in spec.labels
+    runtime_names = [name for name, _size, _sha in spec.runtime_files]
+    assert "modeling_phase2_tc.py" in runtime_names
+    assert "config.json" in runtime_names
+    assert "model.safetensors" not in runtime_names
+
+
+def test_registry_rejects_donor_and_unknown_ids_with_selectable_list() -> None:
+    with pytest.raises(ValueError, match="not selectable") as donor_error:
+        load_model_spec(REGISTRY, "mdeberta-v3-base")
+    for model_id in ("hushmark-tr", "gliner_multi_pii-v1", "lfm2.5-encoder-350m-pii"):
+        assert model_id in str(donor_error.value)
+    with pytest.raises(ValueError, match="unknown model id") as unknown_error:
+        load_model_spec(REGISTRY, "bogus-model")
+    assert "hushmark-tr" in str(unknown_error.value)
+
+
+def test_available_models_lists_only_selectable_detectors() -> None:
+    available = {model.id: model for model in list_available_models(REGISTRY)}
+    assert set(available) == {"hushmark-tr", "gliner_multi_pii-v1", "lfm2.5-encoder-350m-pii"}
+    assert available["hushmark-tr"].backends == ("torch", "onnx")
+    assert available["lfm2.5-encoder-350m-pii"].backends == ("torch",)
+    assert available["lfm2.5-encoder-350m-pii"].architecture == "token-classification"
+
+
+def test_token_classification_model_refuses_onnx_backend(tmp_path: Path) -> None:
+    with pytest.raises(OnnxUnsupported, match="torch backend only"):
+        create_backend(
+            backend="onnx",
+            registry_path=REGISTRY,
+            model_root=tmp_path,
+            model_id="lfm2.5-encoder-350m-pii",
+            onnx_model_file="model.onnx",
+        )
+
+
+def test_token_classification_backend_requires_fetched_weights(tmp_path: Path) -> None:
+    spec = load_model_spec(REGISTRY, "lfm2.5-encoder-350m-pii")
+    backend = HfTokenClassificationBackend(model_dir=tmp_path, spec=spec)
+    with pytest.raises(FileNotFoundError, match="fetch-models"):
+        backend.load()
+    assert backend.model_sha256 is None
+
+
+def test_token_classification_backend_rejects_tampered_weights_before_import(
+    tmp_path: Path,
+) -> None:
+    spec = load_model_spec(REGISTRY, "lfm2.5-encoder-350m-pii")
+    (tmp_path / "model.safetensors").write_bytes(b"tampered")
+    backend = HfTokenClassificationBackend(model_dir=tmp_path, spec=spec)
+    with pytest.raises(ValueError, match="size verification"):
+        backend.load()
+    assert backend.model_sha256 is None
 
 
 def test_decoder_rejects_mapping_outside_ner_taxonomy() -> None:

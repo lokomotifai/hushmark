@@ -100,12 +100,19 @@ class MaskResponse(StrictModel):
     taxonomy_version: str
 
 
+class AvailableModel(StrictModel):
+    id: str
+    architecture: str
+    backends: list[str]
+
+
 class MetadataResponse(StrictModel):
     version: str
     model_id: str
     model_sha256: str | None
     taxonomy_version: str
     backends: list[str]
+    available_models: list[AvailableModel]
 
 
 class HealthResponse(StrictModel):

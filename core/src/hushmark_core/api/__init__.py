@@ -7,6 +7,8 @@ import secrets
 import time
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
+from functools import lru_cache
+from pathlib import Path
 from typing import Literal
 
 import uvicorn
@@ -20,6 +22,7 @@ from hushmark_core.api.schemas import (
     AnalyzeItem,
     AnalyzeRequest,
     AnalyzeResponse,
+    AvailableModel,
     EntitySpan,
     HealthResponse,
     MappingRecord,
@@ -32,6 +35,7 @@ from hushmark_core.config import get_settings
 from hushmark_core.engine import get_engine
 from hushmark_core.logging import configure_logging, log_event
 from hushmark_core.masking import PlaceholderCollision, mask_text
+from hushmark_core.ner.registry import list_available_models
 from hushmark_core.taxonomy_gen import TAXONOMY_VERSION
 
 CoreOutcome = Literal["ok", "error", "auth_failed", "body_too_large", "capacity_exceeded"]
@@ -220,6 +224,18 @@ async def mask(payload: MaskRequest) -> MaskResponse:
     )
 
 
+@lru_cache(maxsize=4)
+def available_models_payload(registry_path: str) -> tuple[AvailableModel, ...]:
+    return tuple(
+        AvailableModel(
+            id=model.id,
+            architecture=model.architecture,
+            backends=list(model.backends),
+        )
+        for model in list_available_models(Path(registry_path))
+    )
+
+
 @app.get("/v1/metadata", response_model=MetadataResponse)
 async def metadata() -> MetadataResponse:
     engine = get_engine()
@@ -229,6 +245,7 @@ async def metadata() -> MetadataResponse:
         model_sha256=engine.model_sha256,
         taxonomy_version=str(TAXONOMY_VERSION),
         backends=["torch", "onnx"],
+        available_models=list(available_models_payload(str(get_settings().model_registry))),
     )
 
 
