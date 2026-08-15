@@ -83,12 +83,12 @@ def check_production_compose() -> None:
     assert set(services) == {"core", "gateway", "caddy"}
     expected_images = {
         "core": (
-            "ghcr.io/hushmark/core@"
-            "sha256:98ebc594b2817d3c1c46c5d422886a1374c24bbd25fe53c18bbeb2b026a63c7b"
+            "ghcr.io/lokomotifai/core@"
+            "sha256:10dc09a9c610de785155015a70dbc2f29b505de16e16aaf54032e904271b4293"
         ),
         "gateway": (
-            "ghcr.io/hushmark/gateway@"
-            "sha256:423d01f2b32dea264bef3b9bbe7fa697b28dd776979488dde8e58c79cd534515"
+            "ghcr.io/lokomotifai/gateway@"
+            "sha256:4d8bf0c1cd585a350c1de4be13a5656d8ab4741cf2735326bfabbf2bb87161fd"
         ),
         "caddy": (
             "caddy:2.10.2-alpine@"
@@ -166,16 +166,16 @@ def check_chart() -> None:
     assert shared_values["console"]["enabled"] is False
     expected_images = {
         "core": (
-            "ghcr.io/hushmark/core",
-            "sha256:98ebc594b2817d3c1c46c5d422886a1374c24bbd25fe53c18bbeb2b026a63c7b",
+            "ghcr.io/lokomotifai/core",
+            "sha256:10dc09a9c610de785155015a70dbc2f29b505de16e16aaf54032e904271b4293",
         ),
         "gateway": (
-            "ghcr.io/hushmark/gateway",
-            "sha256:423d01f2b32dea264bef3b9bbe7fa697b28dd776979488dde8e58c79cd534515",
+            "ghcr.io/lokomotifai/gateway",
+            "sha256:4d8bf0c1cd585a350c1de4be13a5656d8ab4741cf2735326bfabbf2bb87161fd",
         ),
         "console": (
-            "ghcr.io/hushmark/console",
-            "sha256:d43296d6193df179bd8930cc4bb513084923cb666b6a5c21cb00985611470b0d",
+            "ghcr.io/lokomotifai/console",
+            "sha256:f9819a48a2b68399e3b3437aa16bafebc2132a9ba7807ddd7643773304438c81",
         ),
     }
     for workload, (repository, digest) in expected_images.items():

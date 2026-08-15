@@ -18,7 +18,7 @@ x-hardened-service: &hardened-service
 services:
   core:
     <<: *hardened-service
-    image: ghcr.io/hushmark/core@sha256:98ebc594b2817d3c1c46c5d422886a1374c24bbd25fe53c18bbeb2b026a63c7b
+    image: ghcr.io/lokomotifai/core@sha256:10dc09a9c610de785155015a70dbc2f29b505de16e16aaf54032e904271b4293
     environment:
       HUSHMARK_CORE_HOST: 0.0.0.0
       HUSHMARK_CORE_PORT: "8000"
@@ -62,7 +62,7 @@ services:
 
   gateway:
     <<: *hardened-service
-    image: ghcr.io/hushmark/gateway@sha256:423d01f2b32dea264bef3b9bbe7fa697b28dd776979488dde8e58c79cd534515
+    image: ghcr.io/lokomotifai/gateway@sha256:4d8bf0c1cd585a350c1de4be13a5656d8ab4741cf2735326bfabbf2bb87161fd
     entrypoint: ["/bin/sh", "/opt/hushmark/bin/production-entrypoint.sh"]
     depends_on:
       core:
