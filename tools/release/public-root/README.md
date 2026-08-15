@@ -39,7 +39,7 @@ audit evidence, license issuer, or deployment secrets.
 
 ## Verify the source tree
 
-Prerequisites: Node.js 22, pnpm 9, Python 3.12, and uv.
+Prerequisites: Node.js 22, pnpm 10, Python 3.12, and uv.
 
 ```bash
 git clone https://github.com/lokomotifai/hushmark-open-core.git

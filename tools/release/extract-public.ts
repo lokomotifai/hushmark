@@ -41,7 +41,6 @@ const ROOT_FILES = [
   ".github/ISSUE_TEMPLATE/question.yml",
   "eslint.config.mjs",
   "package.json",
-  "pnpm-lock.yaml",
   "pyproject.toml",
   "renovate.json",
   "tsconfig.base.json",
@@ -451,11 +450,11 @@ async function writeGeneratedFiles(repoRoot: string, output: string): Promise<vo
   await writeFile(join(output, ".github/workflows/release.yml"), publicReleaseWorkflow());
 }
 
-async function regeneratePublicLockfile(repoRoot: string, output: string): Promise<void> {
+async function validatePublicLockfile(repoRoot: string, output: string): Promise<void> {
   const pnpmCli = join(repoRoot, "node_modules", "pnpm", "bin", "pnpm.cjs");
   await execFileAsync(
     process.execPath,
-    [pnpmCli, "install", "--lockfile-only", "--offline", "--ignore-scripts"],
+    [pnpmCli, "install", "--lockfile-only", "--offline", "--frozen-lockfile", "--ignore-scripts"],
     {
       cwd: output,
       env: { ...process.env, CI: "true" },
@@ -499,7 +498,7 @@ export async function extractPublicTree(options: ExtractOptions): Promise<void> 
   const publicRoot = join(repoRoot, "tools/release/public-root");
   for (const entry of await readdir(publicRoot)) await copyEntry(publicRoot, output, entry);
   await writeGeneratedFiles(repoRoot, output);
-  await regeneratePublicLockfile(repoRoot, output);
+  await validatePublicLockfile(repoRoot, output);
   await assertNoLeak(output);
   console.log(`public mirror extracted to ${output}`);
 }
