@@ -227,9 +227,12 @@ export function registerAdminRoutes(
   });
   app.post("/admin/api-keys", adminRoute, async (request) => {
     const principal = await mutationGuard(request);
-    const issued = await issueApiKey(ApiKeySchema.parse(request.body).name, now());
+    // Keep the audit identifier outside the object that carries the one-time secret. This makes
+    // the security boundary explicit to both reviewers and static data-flow analysis.
+    const apiKeyId = randomUUID();
+    const issued = await issueApiKey(ApiKeySchema.parse(request.body).name, now(), apiKeyId);
     await dependencies.identity.putApiKey(issued.summary, issued.secretHash);
-    await auditAdminChange(dependencies.audit, "KEY_CREATED", principal, issued.summary.id);
+    await auditAdminChange(dependencies.audit, "KEY_CREATED", principal, apiKeyId);
     return { ...issued.summary, secret: issued.secret };
   });
   app.delete("/admin/api-keys/:id", adminRoute, async (request) => {
