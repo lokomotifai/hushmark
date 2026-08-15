@@ -42,7 +42,7 @@
     "@electric-sql/pglite": "0.5.4",
     "@types/pg": "^8.15.5",
     "@types/react": "^19.2.0",
-    "drizzle-kit": "^0.31.8",
+    "drizzle-kit": "^0.31.10",
     "tsup": "^8.5.1",
     "vitest": "^4.0.18",
     "pdf-parse": "2.4.5"

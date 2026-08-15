@@ -60,6 +60,18 @@ def test_torch_backend_detects_turkish_person_from_offline_model() -> None:
         span.entity_type == "PERSON" and text[span.start : span.end] == "Ayşe Yılmaz"
         for span in spans
     )
+    assert backend.model_sha256 == spec.sha256
+
+
+def test_torch_backend_rejects_tampered_weights_before_import(tmp_path: Path) -> None:
+    spec = load_model_spec(ROOT / "core" / "models.yaml", "hushmark-tr")
+    model_dir = tmp_path / spec.id
+    model_dir.mkdir()
+    (model_dir / "pytorch_model.bin").write_bytes(b"tampered")
+    backend = TorchNerBackend(model_dir=model_dir, spec=spec)
+    with pytest.raises(ValueError, match="size verification"):
+        backend.load()
+    assert backend.model_sha256 is None
 
 
 def test_torch_and_onnx_backends_have_span_parity_on_turkish_fixture() -> None:

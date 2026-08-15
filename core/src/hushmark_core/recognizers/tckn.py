@@ -2,11 +2,8 @@
 
 from __future__ import annotations
 
-import re
-
 from hushmark_core.recognizers.base import DetectorHit, ValidatorRecognizer
-
-TCKN_PATTERN = re.compile(r"(?<!\d)[1-9]\d{10}(?!\d)")
+from hushmark_core.recognizers.digits import iter_digit_candidates
 
 
 def validate_tckn(value: str) -> bool:
@@ -22,9 +19,9 @@ def validate_tckn(value: str) -> bool:
 
 def detect_tckn(text: str) -> list[DetectorHit]:
     return [
-        DetectorHit("TR_TCKN", match.start(), match.end(), 1.0)
-        for match in TCKN_PATTERN.finditer(text)
-        if validate_tckn(match.group())
+        DetectorHit("TR_TCKN", start, end, 1.0)
+        for start, end, normalized in iter_digit_candidates(text, 11)
+        if validate_tckn(normalized)
     ]
 
 

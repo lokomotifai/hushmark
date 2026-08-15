@@ -17,7 +17,8 @@
   },
   "dependencies": {
     "@hushmark/shared": "workspace:*",
-    "next": "16.2.12",
+    "@swc/helpers": "0.5.23",
+    "next": "16.3.1",
     "next-intl": "4.13.4",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",

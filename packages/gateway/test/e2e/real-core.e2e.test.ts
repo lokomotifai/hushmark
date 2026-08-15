@@ -71,8 +71,41 @@ it("round-trips against the real offline ONNX core over HTTP", async () => {
   expect(forwarded).not.toContain("Ayşe Yılmaz");
   expect(response.body).toContain("Ayşe Yılmaz");
   expect(response.body).toContain("10000000146");
+
+  const formatted = [..."10000000146"].join("\u00a0");
+  const variant = await app.inject({
+    method: "POST",
+    url: "/v1/chat/completions",
+    headers: { authorization: `Bearer ${API_KEY}` },
+    payload: { model: "test", messages: [{ role: "user", content: formatted }] },
+  });
+  expect(variant.statusCode, variant.body).toBe(200);
+  expect(JSON.stringify(upstream.requests.at(-1))).not.toContain(formatted);
+  expect(JSON.stringify(upstream.requests.at(-1))).toContain("[TCKN_1]");
+  expect(variant.body).toContain(formatted);
+
+  const split = await app.inject({
+    method: "POST",
+    url: "/v1/chat/completions",
+    headers: { authorization: `Bearer ${API_KEY}` },
+    payload: {
+      model: "test",
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "text", text: "10000" },
+            { type: "text", text: "000146" },
+          ],
+        },
+      ],
+    },
+  });
+  expect(split.statusCode, split.body).toBe(200);
+  expect(JSON.stringify(upstream.requests.at(-1))).not.toContain("10000000146");
+  expect(JSON.stringify(upstream.requests.at(-1))).toContain("[TCKN_1]");
   await app.close();
-}, 30_000);
+}, 90_000);
 
 async function freePort(): Promise<number> {
   const server = createServer();

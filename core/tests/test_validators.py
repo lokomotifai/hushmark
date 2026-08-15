@@ -13,9 +13,9 @@ from hushmark_core.recognizers.secrets import (
     validate_jwt,
     validate_private_key,
 )
-from hushmark_core.recognizers.sgk import validate_tr_sgk
-from hushmark_core.recognizers.tckn import validate_tckn
-from hushmark_core.recognizers.vkn import calculate_vkn_checksum, validate_vkn
+from hushmark_core.recognizers.sgk import detect_tr_sgk, validate_tr_sgk
+from hushmark_core.recognizers.tckn import detect_tckn, validate_tckn
+from hushmark_core.recognizers.vkn import calculate_vkn_checksum, detect_vkn, validate_vkn
 
 
 def build_tckn(seed: int) -> str:
@@ -77,6 +77,24 @@ def test_tckn_rejects_invalid_checksum_vectors(value: str) -> None:
     assert not validate_tckn(value)
 
 
+@pytest.mark.parametrize(
+    "render",
+    [
+        lambda value: " ".join(value),
+        lambda value: ".".join(value),
+        lambda value: "\u200b".join(value),
+        lambda value: "\u00a0".join(value),
+        lambda value: "".join(chr(0x0660 + int(char)) for char in value),
+        lambda value: "".join(chr(0xFF10 + int(char)) for char in value),
+    ],
+)
+def test_tckn_detects_separator_and_unicode_variants(render) -> None:
+    rendered = render("10000000078")
+    hits = detect_tckn(f"TCKN: {rendered}")
+    assert len(hits) == 1
+    assert hits[0].end - hits[0].start == len(rendered)
+
+
 @pytest.mark.parametrize("value", VALID_VKN)
 def test_vkn_accepts_valid_vectors(value: str) -> None:
     assert validate_vkn(value)
@@ -85,6 +103,12 @@ def test_vkn_accepts_valid_vectors(value: str) -> None:
 @pytest.mark.parametrize("value", [mutate_last_digit(value) for value in VALID_VKN])
 def test_vkn_rejects_invalid_checksum_vectors(value: str) -> None:
     assert not validate_vkn(value)
+
+
+def test_vkn_detects_formatted_unicode_digits() -> None:
+    value = VALID_VKN[0]
+    rendered = "\u00a0".join(chr(0xFF10 + int(char)) for char in value)
+    assert len(detect_vkn(f"VKN: {rendered}")) == 1
 
 
 @pytest.mark.parametrize("value", VALID_TR_IBAN + VALID_OTHER_IBAN)
@@ -141,6 +165,13 @@ def test_sgk_accepts_valid_vectors(value: str) -> None:
 @pytest.mark.parametrize("value", [f"{index + 1:012d}" for index in range(20)])
 def test_sgk_rejects_invalid_length_vectors(value: str) -> None:
     assert not validate_tr_sgk(value)
+
+
+def test_sgk_detects_formatted_digits_with_context() -> None:
+    rendered = ".".join("0000000000001")
+    hits = detect_tr_sgk(f"SGK sicil: {rendered}")
+    assert len(hits) == 1
+    assert hits[0].score == 0.88
 
 
 @pytest.mark.parametrize("value", VALID_EMAILS)

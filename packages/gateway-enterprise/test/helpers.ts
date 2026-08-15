@@ -18,6 +18,7 @@ import { signLicensePayload } from "../src/license/verify.js";
 import { buildEnterpriseServer, type EnterpriseRuntime } from "../src/server.js";
 
 export const API_KEY = "hm_k1_1234567890abcdef";
+export const API_KEY_ID = "10000000-0000-4000-8000-000000000099";
 export const ADMIN_PASSWORD = "correct horse battery staple";
 export const SESSION_ID = "019121aa-7c3e-7bbb-9a10-3f6e2b4c9d21";
 export const CANARY_NAME = "Ayşe Yılmaz";
@@ -69,6 +70,16 @@ export async function enterpriseHarness(): Promise<EnterpriseHarness> {
         enabled: true,
       }),
     ),
+  );
+  await identity.putApiKey(
+    {
+      id: API_KEY_ID,
+      name: "test-gateway-key",
+      prefix: API_KEY.slice(0, 18),
+      revokedAt: null,
+      createdAt: clock.now().toISOString(),
+    },
+    await hashSecret(API_KEY),
   );
   const { privateKey, publicKey } = generateKeyPairSync("ed25519");
   const payload: UnsignedLicense = {
@@ -130,6 +141,11 @@ export function testConfig(): GatewayConfig {
     HUSHMARK_POLICY_PATH: "policy.yaml",
     HUSHMARK_VAULT_MAX_ENTRIES: 100,
     HUSHMARK_VAULT_TTL_SEC: 3_600,
+    HUSHMARK_UNMASK_LIMIT: 100,
+    HUSHMARK_RATE_LIMIT_MAX: 120,
+    HUSHMARK_RATE_LIMIT_WINDOW_SEC: 60,
+    HUSHMARK_BODY_LIMIT_BYTES: 1_048_576,
+    HUSHMARK_TRUST_PROXY: false,
   };
 }
 

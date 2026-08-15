@@ -35,8 +35,8 @@ it("prefix mode and session continuity issue stable placeholders", async () => {
   expect((await request(app, "[KISI_1] Ayşe Yılmaz")).statusCode).toBe(200);
   expect((await request(app, "Ayşe Yılmaz")).statusCode).toBe(200);
   const bodies = upstream.requests.map((entry) => JSON.stringify(entry.body));
-  expect(bodies[0]).toContain("[KISI_1]#abcd");
-  expect(bodies[1]).toContain("[KISI_1]#abcd");
+  expect(bodies[0]).toContain("[KISI_1]#abcdabcdabcdabcd");
+  expect(bodies[1]).toContain("[KISI_1]#abcdabcdabcdabcd");
   await app.close();
 });
 

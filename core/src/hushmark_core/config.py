@@ -1,11 +1,13 @@
 """Validated core configuration."""
 
+from __future__ import annotations
+
 import os
 from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field, field_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from hushmark_core.taxonomy_gen import TAXONOMY
@@ -20,7 +22,7 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    host: str = "0.0.0.0"
+    host: str = "127.0.0.1"
     port: int = Field(default=8000, ge=1, le=65535)
     log_level: Literal["debug", "info", "warning", "error"] = "info"
     ner_backend: Literal["disabled", "torch", "onnx"] = "torch"
@@ -30,6 +32,22 @@ class Settings(BaseSettings):
     model_root: Path = Path(__file__).resolve().parents[3] / "models"
     model_registry: Path = Path(__file__).resolve().parents[2] / "models.yaml"
     onnx_model_file: str = "model.onnx"
+    service_token: SecretStr | None = None
+    service_token_file: Path | None = None
+    body_limit_bytes: int = Field(default=1_048_576, ge=1, le=16_777_216)
+    max_concurrency: int = Field(default=4, ge=1, le=128)
+    queue_timeout_ms: int = Field(default=250, ge=1, le=30_000)
+
+    @model_validator(mode="after")
+    def require_token_when_network_exposed(self) -> Settings:
+        if self.service_token is None and self.service_token_file is not None:
+            value = self.service_token_file.read_text(encoding="utf-8").strip()
+            self.service_token = SecretStr(value)
+        if self.service_token is not None and len(self.service_token.get_secret_value()) < 32:
+            raise ValueError("HUSHMARK_CORE_SERVICE_TOKEN must contain at least 32 characters")
+        if self.host not in {"127.0.0.1", "::1", "localhost"} and self.service_token is None:
+            raise ValueError("HUSHMARK_CORE_SERVICE_TOKEN is required when core is network-exposed")
+        return self
 
     @field_validator("ner_thresholds")
     @classmethod

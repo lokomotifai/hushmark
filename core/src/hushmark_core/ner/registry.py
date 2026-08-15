@@ -20,6 +20,7 @@ class ModelSpec:
     revision: str
     distribution: str
     sha256: str
+    size: int
     labels: dict[str, str]
     onnx_confidence_scale: float
     onnx_file: str
@@ -47,7 +48,12 @@ def load_model_spec(registry_path: Path, model_id: str) -> ModelSpec:
             ),
             None,
         )
-        if not isinstance(weight, dict) or not isinstance(weight.get("sha256"), str):
+        if (
+            not isinstance(weight, dict)
+            or not isinstance(weight.get("sha256"), str)
+            or not isinstance(weight.get("size"), int)
+            or weight["size"] <= 0
+        ):
             raise ValueError(f"model {model_id} has no pinned weight SHA-256")
         distribution = str(model.get("distribution", "remote"))
         if distribution not in {"remote", "local-artifact"}:
@@ -76,6 +82,7 @@ def load_model_spec(registry_path: Path, model_id: str) -> ModelSpec:
             revision=str(model["revision"]),
             distribution=distribution,
             sha256=weight["sha256"],
+            size=weight["size"],
             labels=string_labels,
             onnx_confidence_scale=onnx_confidence_scale,
             onnx_file=onnx_file,

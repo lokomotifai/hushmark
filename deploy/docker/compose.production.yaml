@@ -29,6 +29,12 @@ services:
       HUSHMARK_CORE_MODEL_ROOT: /models
       HUSHMARK_CORE_MODEL_REGISTRY: /opt/hushmark/core/models.yaml
       HUSHMARK_CORE_ONNX_MODEL_FILE: model.onnx
+      HUSHMARK_CORE_SERVICE_TOKEN_FILE: /run/secrets/core_service_token
+      HUSHMARK_CORE_BODY_LIMIT_BYTES: ${HUSHMARK_CORE_BODY_LIMIT_BYTES:-1048576}
+      HUSHMARK_CORE_MAX_CONCURRENCY: ${HUSHMARK_CORE_MAX_CONCURRENCY:-4}
+      HUSHMARK_CORE_QUEUE_TIMEOUT_MS: ${HUSHMARK_CORE_QUEUE_TIMEOUT_MS:-250}
+    secrets:
+      - core_service_token
     volumes:
       - type: bind
         source: ${HUSHMARK_MODEL_DIR:?set HUSHMARK_MODEL_DIR to the directory containing hushmark-tr}
@@ -70,10 +76,16 @@ services:
       HUSHMARK_POLICY_PATH: /etc/hushmark/policy.yaml
       HUSHMARK_VAULT_MAX_ENTRIES: ${HUSHMARK_VAULT_MAX_ENTRIES:-100000}
       HUSHMARK_VAULT_TTL_SEC: ${HUSHMARK_VAULT_TTL_SEC:-86400}
+      HUSHMARK_UNMASK_LIMIT: ${HUSHMARK_UNMASK_LIMIT:-100}
+      HUSHMARK_RATE_LIMIT_MAX: ${HUSHMARK_RATE_LIMIT_MAX:-120}
+      HUSHMARK_RATE_LIMIT_WINDOW_SEC: ${HUSHMARK_RATE_LIMIT_WINDOW_SEC:-60}
+      HUSHMARK_BODY_LIMIT_BYTES: ${HUSHMARK_BODY_LIMIT_BYTES:-1048576}
+      HUSHMARK_TRUST_PROXY: ${HUSHMARK_TRUST_PROXY:-true}
     secrets:
       - hushmark_api_keys
       - openai_api_key
       - anthropic_api_key
+      - core_service_token
     volumes:
       - ./production/gateway-entrypoint.sh:/opt/hushmark/bin/production-entrypoint.sh:ro
       - ./production/policy.yaml:/etc/hushmark/policy.yaml:ro
@@ -125,6 +137,8 @@ secrets:
     file: ${HUSHMARK_SECRETS_DIR:?set HUSHMARK_SECRETS_DIR}/openai-api-key
   anthropic_api_key:
     file: ${HUSHMARK_SECRETS_DIR:?set HUSHMARK_SECRETS_DIR}/anthropic-api-key
+  core_service_token:
+    file: ${HUSHMARK_SECRETS_DIR:?set HUSHMARK_SECRETS_DIR}/core-service-token
 
 networks:
   edge: {}

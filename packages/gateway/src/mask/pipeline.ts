@@ -9,18 +9,24 @@ import type { StaticPolicy } from "../config.js";
 import type { CorePort } from "../coreClient.js";
 import { GatewayError } from "../errors.js";
 import { StaticPolicyEvaluator } from "../policy/static.js";
-import type { PlaceholderVault } from "../vault/memory.js";
+import type { PlaceholderVault, VaultScope } from "../vault/memory.js";
 
 export interface TextSegment {
   id: string;
   text: string;
-  set(value: string): void;
+  set: (value: string) => void;
 }
 
 export interface MaskEvent {
   event: "MASK_APPLIED";
+  tenant_id: string;
   session_id: string;
   entities: { type: EntityType; action: "allow" | "mask"; count: number }[];
+}
+
+export interface MaskApplication {
+  response: MaskResponse;
+  issuedPlaceholders: Set<string>;
 }
 
 export class MaskPipeline {
@@ -36,17 +42,18 @@ export class MaskPipeline {
     this.#policy = new StaticPolicyEvaluator(policy);
   }
 
-  async apply(segments: TextSegment[], session: string): Promise<MaskResponse> {
+  async apply(segments: TextSegment[], scope: VaultScope): Promise<MaskApplication> {
     const request: MaskRequest = {
       items: segments.map(({ id, text }) => ({ id, text })),
       language: "tr",
-      session,
+      session: scope.sessionId,
       include_values: true,
       collision_mode: this.#policy.policy.defaults.collision_mode,
     };
     const response = await this.core.mask(request);
     const segmentsById = new Map(segments.map((segment) => [segment.id, segment]));
     const blocked = new Set<EntityType>();
+    const issuedPlaceholders = new Set<string>();
     const counts = new Map<string, { type: EntityType; action: "allow" | "mask"; count: number }>();
 
     for (const item of response.items) {
@@ -71,11 +78,12 @@ export class MaskPipeline {
         if (action === "allow") {
           maskedText = replaceAllLiteral(maskedText, mapping.placeholder, mapping.value);
         } else {
-          const canonical = await this.vault.intern(session, mapping.placeholder, {
+          const canonical = await this.vault.intern(scope, mapping.placeholder, {
             type: mapping.type,
             value: mapping.value,
             ttlSec: this.ttlSec,
           });
+          issuedPlaceholders.add(canonical);
           maskedText = replaceAllLiteral(maskedText, mapping.placeholder, canonical);
         }
         const key = `${mapping.type}\0${action}`;
@@ -93,10 +101,11 @@ export class MaskPipeline {
     }
     await this.onEvent({
       event: "MASK_APPLIED",
-      session_id: session,
+      tenant_id: scope.tenantId,
+      session_id: scope.sessionId,
       entities: [...counts.values()],
     });
-    return response;
+    return { response, issuedPlaceholders };
   }
 }
 

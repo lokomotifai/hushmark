@@ -4,6 +4,8 @@ import { expect, it } from "vitest";
 import { StreamingUnmasker, unmaskText } from "../../src/streaming/unmasker.js";
 import { MemoryVault } from "../../src/vault/memory.js";
 
+const SCOPE = { tenantId: "tenant-1", sessionId: "s1" };
+
 it("INV-05 reassembles every arbitrary chunk slicing like whole-text unmasking", async () => {
   await fc.assert(
     fc.asyncProperty(
@@ -11,10 +13,22 @@ it("INV-05 reassembles every arbitrary chunk slicing like whole-text unmasking",
       fc.array(fc.nat({ max: 8 }), { maxLength: 20 }),
       async (parts, sizes) => {
         const vault = new MemoryVault();
-        await vault.put("s1", "[KISI_1]", { type: "PERSON", value: "Ayşe İpek", ttlSec: 60 });
+        await vault.put(SCOPE, "[KISI_1]", {
+          type: "PERSON",
+          value: "Ayşe İpek",
+          ttlSec: 60,
+        });
         const text = `${parts.join("")}[KISI_1]${[...parts].reverse().join("")}`;
-        const expected = await unmaskText(text, "s1", vault);
-        const unmasker = new StreamingUnmasker("s1", vault);
+        const expected = await unmaskText(text, SCOPE, vault, {
+          allowedPlaceholders: new Set(["[KISI_1]"]),
+          remaining: 100,
+          limitReported: false,
+        });
+        const unmasker = new StreamingUnmasker(SCOPE, vault, {
+          allowedPlaceholders: new Set(["[KISI_1]"]),
+          remaining: 100,
+          limitReported: false,
+        });
         const chunks: string[] = [];
         let cursor = 0;
         for (const size of sizes) {

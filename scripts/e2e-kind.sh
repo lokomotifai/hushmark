@@ -90,7 +90,8 @@ kubectl create namespace "$namespace"
 kubectl -n "$namespace" create secret generic hushmark-gateway \
   --from-literal=api-keys=hm_k1_evaluation_local_key \
   --from-literal=openai-api-key=evaluation \
-  --from-literal=anthropic-api-key=evaluation
+  --from-literal=anthropic-api-key=evaluation \
+  --from-literal=core-service-token=hushmark-evaluation-core-service-token
 kubectl -n "$namespace" create secret generic hushmark-license \
   --from-file=license.json=deploy/docker/eval/license.json \
   --from-file=public.pem=deploy/docker/eval/public.pem
@@ -98,9 +99,13 @@ kubectl -n "$namespace" create secret generic hushmark-admin \
   --from-literal=password=hushmark-evaluation-admin
 kubectl -n "$namespace" create secret generic hushmark-kms \
   --from-literal=token=hushmark-evaluation-token
+kubectl -n "$namespace" create secret generic hushmark-audit \
+  --from-file=hmac-key=deploy/docker/eval/audit-hmac-key
 kubectl -n "$namespace" create secret generic hushmark-postgres \
   --from-literal=password=hushmark-evaluation-only \
   --from-literal=database-url=postgres://hushmark:hushmark-evaluation-only@hushmark-postgres:5432/hushmark
+kubectl -n "$namespace" create configmap fake-upstream-script \
+  --from-file=fake-upstream.mjs=deploy/docker/eval/fake-upstream.mjs
 
 kubectl -n "$namespace" apply -f deploy/kind/eval-services.yaml
 kubectl -n "$namespace" rollout status deployment/vault --timeout=120s
@@ -124,6 +129,7 @@ helm upgrade --install hushmark deploy/helm/hushmark \
   --set console.resources.requests.cpu=50m \
   --set console.resources.requests.memory=128Mi \
   --set enterprise.enabled=true \
+  --set enterprise.evaluationMode=true \
   --set enterprise.kms.vaultAddress=http://vault:8200 \
   --set postgres.enabled=true \
   --set postgres.persistence.enabled=false \

@@ -2,11 +2,8 @@
 
 from __future__ import annotations
 
-import re
-
 from hushmark_core.recognizers.base import DetectorHit, ValidatorRecognizer
-
-VKN_PATTERN = re.compile(r"(?<!\d)\d{10}(?!\d)")
+from hushmark_core.recognizers.digits import iter_digit_candidates
 
 
 def calculate_vkn_checksum(first_nine: str) -> int:
@@ -32,9 +29,9 @@ def validate_vkn(value: str) -> bool:
 
 def detect_vkn(text: str) -> list[DetectorHit]:
     return [
-        DetectorHit("TR_VKN", match.start(), match.end(), 1.0)
-        for match in VKN_PATTERN.finditer(text)
-        if validate_vkn(match.group())
+        DetectorHit("TR_VKN", start, end, 1.0)
+        for start, end, normalized in iter_digit_candidates(text, 10)
+        if validate_vkn(normalized)
     ]
 
 

@@ -19,12 +19,16 @@ Create the gateway secret before installation. The secret keys are configurable 
 kubectl create namespace hushmark
 kubectl -n hushmark create secret generic hushmark-gateway \
   --from-literal=api-keys='hm_k1_replace_with_at_least_16_chars' \
+  --from-literal=core-service-token='replace-with-at-least-32-random-characters' \
   --from-literal=openai-api-key='replace' \
   --from-literal=anthropic-api-key='replace'
 ```
 
-For enterprise mode, also create the license/public-key, database, admin, and KMS secrets named by
-the chart values. Do not place plaintext secret values in a committed values file.
+For enterprise mode, also create the license/public-key, database, admin, audit-HMAC, and KMS
+secrets named by the chart values. Do not place plaintext secret values in a committed values file.
+The enterprise process applies packaged database migrations under a PostgreSQL advisory lock at
+startup. The security-hardening migration intentionally deletes legacy, tenantless vault rows;
+drain active conversations before upgrading from an earlier v0.1.0 checkout.
 
 ## Install
 
@@ -40,6 +44,9 @@ helm upgrade --install hushmark deploy/helm/hushmark \
 
 Verify `deployment/hushmark-core` and `deployment/hushmark-gateway` readiness. Expose only the
 gateway through an authenticated internal ingress. The core Service must remain `ClusterIP`.
+When NetworkPolicy is enabled, label the ingress controller namespace with
+`hushmark.ai/gateway-access=true`; only that namespace and the Hushmark console pods may reach the
+gateway.
 
 ## Shared-cluster release
 

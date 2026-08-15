@@ -7,12 +7,21 @@ import { verifyAuditChain } from "./audit/verify.js";
 
 const options = parseOptions(process.argv.slice(2));
 const records = await loadRecords();
-const result = verifyAuditChain(records, options.from, options.to);
+const integrityKeyFile = process.env.HUSHMARK_AUDIT_HMAC_KEY_FILE;
+const integrityKey =
+  integrityKeyFile === undefined ? undefined : await readIntegrityKey(integrityKeyFile);
+const result = verifyAuditChain(records, options.from, options.to, integrityKey);
 if (!result.ok) {
   process.stderr.write(`audit chain broken at seq ${String(result.firstBrokenSeq)}\n`);
   process.exitCode = 1;
 } else {
   process.stdout.write(`audit chain verified: ${String(result.verified)} events\n`);
+}
+
+async function readIntegrityKey(path: string): Promise<Buffer> {
+  const key = await readFile(path);
+  if (key.byteLength < 32) throw new Error("audit HMAC key must contain at least 32 bytes");
+  return key;
 }
 
 async function loadRecords(): Promise<AuditRecord[]> {

@@ -23,6 +23,9 @@ core:
       memory: 6Gi
   nerBackend: onnx
   nerThreshold: 0.55
+  bodyLimitBytes: 1048576
+  maxConcurrency: 4
+  queueTimeoutMs: 250
 
 gateway:
   replicaCount: 1
@@ -38,6 +41,12 @@ gateway:
   apiKeyKey: api-keys
   openaiApiKeyKey: openai-api-key
   anthropicApiKeyKey: anthropic-api-key
+  coreServiceTokenKey: core-service-token
+  trustProxy: true
+  unmaskLimit: 100
+  rateLimitMax: 120
+  rateLimitWindowSec: 60
+  bodyLimitBytes: 1048576
   openaiUpstream: https://api.openai.com/v1
   anthropicUpstream: https://api.anthropic.com/v1
   resources:
@@ -69,6 +78,7 @@ console:
 
 enterprise:
   enabled: false
+  evaluationMode: false
   licenseSecret: hushmark-license
   licenseKey: license.json
   publicKeyKey: public.pem
@@ -77,6 +87,8 @@ enterprise:
   adminEmail: admin@hushmark.local
   adminSecret: hushmark-admin
   adminPasswordKey: password
+  auditHmacSecret: hushmark-audit
+  auditHmacKey: hmac-key
   kms:
     kind: vault
     keyId: hushmark

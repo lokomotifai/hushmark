@@ -7,6 +7,8 @@ import { KmsEnvelopeVault } from "../../src/vault/kmsEnvelope.js";
 import { MemoryVaultRepository } from "../../src/vault/repository.js";
 import { TestClock } from "../helpers.js";
 
+const SCOPE = { tenantId: "tenant", sessionId: "session" };
+
 it("round-trips AES-GCM envelope records, preserves stable placeholders, and gates de-mask", async () => {
   const clock = new TestClock();
   const auditStore = new MemoryAuditStore();
@@ -18,29 +20,27 @@ it("round-trips AES-GCM envelope records, preserves stable placeholders, and gat
     new AuditWriter(auditStore, clock),
     () => clock.now().getTime(),
   );
-  const first = await vault.intern("session", "[KISI_1]", {
+  const first = await vault.intern(SCOPE, "[KISI_1]", {
     type: "PERSON",
     value: "Ayşe Yılmaz",
     ttlSec: 60,
   });
-  const second = await vault.intern("session", "[KISI_2]", {
+  const second = await vault.intern(SCOPE, "[KISI_2]", {
     type: "PERSON",
     value: "Ayşe Yılmaz",
     ttlSec: 60,
   });
   expect(first).toBe("[KISI_1]");
   expect(second).toBe(first);
-  await expect(vault.resolveAs("auditor", "user:a", "session", first)).rejects.toMatchObject({
+  await expect(vault.resolveAs("auditor", "user:a", SCOPE, first)).rejects.toMatchObject({
     code: "HM-4030",
   });
-  await expect(vault.resolveAs("operator", "user:o", "session", first)).resolves.toBe(
-    "Ayşe Yılmaz",
-  );
+  await expect(vault.resolveAs("operator", "user:o", SCOPE, first)).resolves.toBe("Ayşe Yılmaz");
   expect(
-    Buffer.from((await repository.get("session", first))?.ciphertext ?? []).toString(),
+    Buffer.from((await repository.get(SCOPE, first))?.ciphertext ?? []).toString(),
   ).not.toContain("Ayşe Yılmaz");
 
   clock.set("2026-08-09T00:02:00.000Z");
   expect(await vault.sweep(clock.now())).toBe(1);
-  await expect(vault.resolve("session", first)).resolves.toBeNull();
+  await expect(vault.resolve(SCOPE, first)).resolves.toBeNull();
 });

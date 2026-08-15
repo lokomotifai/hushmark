@@ -16,6 +16,7 @@ export const EnvSchema = z
       .transform((value) => value.split(",").map((key) => key.trim()))
       .pipe(z.array(ApiKeySchema).min(1)),
     HUSHMARK_CORE_URL: z.url().default("http://127.0.0.1:8000"),
+    HUSHMARK_CORE_SERVICE_TOKEN: z.string().min(32).optional(),
     HUSHMARK_OPENAI_UPSTREAM: z.url(),
     HUSHMARK_ANTHROPIC_UPSTREAM: z.url(),
     HUSHMARK_OPENAI_API_KEY: z.string().min(1).optional(),
@@ -23,6 +24,14 @@ export const EnvSchema = z
     HUSHMARK_POLICY_PATH: z.string().default("packages/gateway/policy.yaml"),
     HUSHMARK_VAULT_MAX_ENTRIES: z.coerce.number().int().positive().default(100_000),
     HUSHMARK_VAULT_TTL_SEC: z.coerce.number().int().positive().default(86_400),
+    HUSHMARK_UNMASK_LIMIT: z.coerce.number().int().positive().max(1_000).default(100),
+    HUSHMARK_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(120),
+    HUSHMARK_RATE_LIMIT_WINDOW_SEC: z.coerce.number().int().positive().default(60),
+    HUSHMARK_BODY_LIMIT_BYTES: z.coerce.number().int().positive().default(1_048_576),
+    HUSHMARK_TRUST_PROXY: z
+      .enum(["true", "false"])
+      .default("false")
+      .transform((value) => value === "true"),
   })
   .strict();
 

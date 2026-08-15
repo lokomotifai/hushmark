@@ -1,5 +1,6 @@
 from fastapi.testclient import TestClient
 from hushmark_core.api import app
+from hushmark_core.config import get_settings
 
 
 def test_analyze_route_is_strict_and_returns_exact_spans() -> None:
@@ -45,3 +46,39 @@ def test_health_readiness_and_metadata() -> None:
         metadata = client.get("/v1/metadata").json()
     assert metadata["model_id"] == "deterministic-v1"
     assert metadata["backends"] == ["torch", "onnx"]
+
+
+def test_core_service_token_protects_value_bearing_routes(monkeypatch) -> None:
+    token = "core-service-token-with-at-least-32-characters"
+    monkeypatch.setenv("HUSHMARK_CORE_SERVICE_TOKEN", token)
+    get_settings.cache_clear()
+    try:
+        with TestClient(app) as client:
+            unauthorized = client.post("/v1/analyze", json={"items": [{"id": "a", "text": "safe"}]})
+            authorized = client.post(
+                "/v1/analyze",
+                headers={"authorization": f"Bearer {token}"},
+                json={"items": [{"id": "a", "text": "safe"}]},
+            )
+        assert unauthorized.status_code == 401
+        assert authorized.status_code == 200
+    finally:
+        get_settings.cache_clear()
+
+
+def test_core_rejects_request_bodies_over_the_configured_limit(monkeypatch) -> None:
+    monkeypatch.setenv("HUSHMARK_CORE_BODY_LIMIT_BYTES", "32")
+    get_settings.cache_clear()
+    try:
+        with TestClient(app) as client:
+            response = client.post(
+                "/v1/analyze",
+                content=b'{"items":[{"id":"a","text":"' + (b"x" * 64) + b'"}]}',
+                headers={"content-type": "application/json"},
+            )
+        assert response.status_code == 413
+        assert response.json() == {
+            "error": {"code": "HM-4001", "message": "request body too large"}
+        }
+    finally:
+        get_settings.cache_clear()

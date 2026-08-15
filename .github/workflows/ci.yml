@@ -10,13 +10,33 @@ permissions:
   contents: read
 
 jobs:
+  repository-safety:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: ./scripts/check-repository-safety.sh
+      - name: Install Gitleaks
+        run: |
+          curl -fsSLo gitleaks.tar.gz https://github.com/gitleaks/gitleaks/releases/download/v8.28.0/gitleaks_8.28.0_linux_x64.tar.gz
+          curl -fsSLo gitleaks.checksums https://github.com/gitleaks/gitleaks/releases/download/v8.28.0/gitleaks_8.28.0_checksums.txt
+          grep 'gitleaks_8.28.0_linux_x64.tar.gz' gitleaks.checksums \
+            | sed 's#gitleaks_8.28.0_linux_x64.tar.gz#gitleaks.tar.gz#' \
+            | sha256sum --check
+          tar -xzf gitleaks.tar.gz gitleaks
+          sudo install -m 0755 gitleaks /usr/local/bin/gitleaks
+      - name: Scan committed changes for secrets
+        env:
+          GITLEAKS_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+          GITLEAKS_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: gitleaks git --redact --no-banner --verbose --log-opts="${GITLEAKS_BASE}..${GITLEAKS_HEAD}" .
+
   node:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
-        with:
-          version: 9.15.9
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
@@ -86,8 +106,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
-        with:
-          version: 9.15.9
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc

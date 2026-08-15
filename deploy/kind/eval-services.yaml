@@ -40,14 +40,19 @@ spec:
         - name: fake-upstream
           image: hushmark/gateway:0.1.0
           imagePullPolicy: Never
-          command: ["node", "eval/fake-upstream.mjs"]
+          command: ["node", "/opt/hushmark-eval/fake-upstream.mjs"]
           env: [{ name: PORT, value: "9000" }]
           securityContext:
             allowPrivilegeEscalation: false
             capabilities: { drop: ["ALL"] }
             readOnlyRootFilesystem: true
+          volumeMounts:
+            - { name: script, mountPath: /opt/hushmark-eval, readOnly: true }
           ports: [{ name: http, containerPort: 9000 }]
           readinessProbe: { httpGet: { path: /healthz, port: http }, periodSeconds: 3 }
+      volumes:
+        - name: script
+          configMap: { name: fake-upstream-script }
 ---
 apiVersion: v1
 kind: Service

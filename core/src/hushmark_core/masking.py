@@ -12,7 +12,7 @@ from hushmark_core.engine import Entity
 from hushmark_core.taxonomy_gen import TAXONOMY
 
 PLACEHOLDER_PATTERN = re.compile(
-    r"\[[A-Z]{2,12}_[1-9][0-9]{0,4}\](?:#[0-9a-f]{4})?",
+    r"\[[A-Z]{2,12}_[1-9][0-9]{0,4}\](?:#[0-9a-f]{16})?",
     flags=re.ASCII,
 )
 
@@ -40,7 +40,7 @@ class MaskResult:
 
 def collision_suffix(session: str, text: str) -> str:
     material = f"{session}\0{text}".encode()
-    return hashlib.sha256(material).hexdigest()[:4]
+    return hashlib.sha256(material).hexdigest()[:16]
 
 
 def mask_text(
