@@ -32,7 +32,13 @@ describe("provider round-trip", () => {
   it("returns HM-4290 after the configured authenticated request budget is exhausted", async () => {
     await app.close();
     const config = { ...testConfig(), HUSHMARK_RATE_LIMIT_MAX: 1 };
-    app = buildServer({ config, policy: testPolicy(), core: new FakeCore(), upstream });
+    app = buildServer({
+      config,
+      policy: testPolicy(),
+      core: new FakeCore(),
+      upstream,
+      rateLimiter: { consume: () => true },
+    });
     const request = () =>
       app.inject({
         method: "POST",
@@ -44,6 +50,8 @@ describe("provider round-trip", () => {
     const limited = await request();
     expect(limited.statusCode).toBe(429);
     expect(limited.json()).toMatchObject({ error: { code: "HM-4290" } });
+    expect((await app.inject({ method: "GET", url: "/healthz" })).statusCode).toBe(200);
+    expect((await app.inject({ method: "GET", url: "/healthz" })).statusCode).toBe(200);
   });
 
   it.each([

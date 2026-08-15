@@ -1,6 +1,7 @@
 import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
 import { Readable } from "node:stream";
 
+import fastifyRateLimit from "@fastify/rate-limit";
 import fastify, {
   type FastifyInstance,
   type FastifyReply,
@@ -55,6 +56,11 @@ export function buildServer(dependencies: ServerDependencies): FastifyInstance {
         : dependencies.config.HUSHMARK_TRUST_PROXY_HOPS,
   });
   const config = dependencies.config;
+  void app.register(fastifyRateLimit, {
+    global: false,
+    keyGenerator: (request) => request.ip,
+    errorResponseBuilder: () => new GatewayError("HM-4290", "gateway rate limit exceeded"),
+  });
   const apiKeys = config.HUSHMARK_API_KEYS;
   const tenantByRequest = new WeakMap<FastifyRequest, string>();
   const rateLimiter = dependencies.rateLimiter ?? new MemoryRateLimiter();
@@ -87,67 +93,71 @@ export function buildServer(dependencies: ServerDependencies): FastifyInstance {
     void reply.status(gatewayError.statusCode).send(gatewayError.body());
   });
 
-  app.addHook("onRequest", async (request) => {
-    const authMode = (
-      request.routeOptions.config as { hushmarkAuth?: "public" | "gateway" | "admin" }
-    ).hushmarkAuth;
-    if (authMode === "public" || authMode === "admin") return;
-    if (
-      !(await rateLimiter.consume(
-        `gateway-auth:${request.ip}`,
-        config.HUSHMARK_RATE_LIMIT_MAX,
-        config.HUSHMARK_RATE_LIMIT_WINDOW_SEC * 1_000,
-      ))
-    ) {
-      await dependencies.onSecurityEvent?.({
-        kind: "REQUEST_BLOCKED",
-        reason: "auth-rate-limit",
-      });
-      throw new GatewayError("HM-4290", "gateway rate limit exceeded");
-    }
-    const authorization = request.headers.authorization;
-    const key = authorization?.startsWith("Bearer ") === true ? authorization.slice(7) : "";
-    const tenantId =
-      dependencies.authenticateApiKey === undefined
-        ? apiKeys.some((candidate) => safeEqual(candidate, key))
-          ? apiKeyId(key)
-          : null
-        : await dependencies.authenticateApiKey(key);
-    if (tenantId === null) {
-      throw new GatewayError("HM-4010", "missing or invalid gateway API key");
-    }
-    if (
-      !(await rateLimiter.consume(
-        `gateway-tenant:${tenantId}`,
-        config.HUSHMARK_RATE_LIMIT_MAX,
-        config.HUSHMARK_RATE_LIMIT_WINDOW_SEC * 1_000,
-      ))
-    ) {
-      await dependencies.onSecurityEvent?.({
-        kind: "REQUEST_BLOCKED",
-        reason: "tenant-rate-limit",
-        tenantId,
-      });
-      throw new GatewayError("HM-4290", "gateway rate limit exceeded");
-    }
-    tenantByRequest.set(request, tenantId);
-  });
+  app.after(() => {
+    const authenticateGateway = async (request: FastifyRequest): Promise<void> => {
+      if (
+        !(await rateLimiter.consume(
+          `gateway-auth:${request.ip}`,
+          config.HUSHMARK_RATE_LIMIT_MAX,
+          config.HUSHMARK_RATE_LIMIT_WINDOW_SEC * 1_000,
+        ))
+      ) {
+        await dependencies.onSecurityEvent?.({
+          kind: "REQUEST_BLOCKED",
+          reason: "auth-rate-limit",
+        });
+        throw new GatewayError("HM-4290", "gateway rate limit exceeded");
+      }
+      const authorization = request.headers.authorization;
+      const key = authorization?.startsWith("Bearer ") === true ? authorization.slice(7) : "";
+      const tenantId =
+        dependencies.authenticateApiKey === undefined
+          ? apiKeys.some((candidate) => safeEqual(candidate, key))
+            ? apiKeyId(key)
+            : null
+          : await dependencies.authenticateApiKey(key);
+      if (tenantId === null) {
+        throw new GatewayError("HM-4010", "missing or invalid gateway API key");
+      }
+      if (
+        !(await rateLimiter.consume(
+          `gateway-tenant:${tenantId}`,
+          config.HUSHMARK_RATE_LIMIT_MAX,
+          config.HUSHMARK_RATE_LIMIT_WINDOW_SEC * 1_000,
+        ))
+      ) {
+        await dependencies.onSecurityEvent?.({
+          kind: "REQUEST_BLOCKED",
+          reason: "tenant-rate-limit",
+          tenantId,
+        });
+        throw new GatewayError("HM-4290", "gateway rate limit exceeded");
+      }
+      tenantByRequest.set(request, tenantId);
+    };
+    const gatewayRoute = {
+      config: {
+        hushmarkAuth: "gateway" as const,
+        rateLimit: {
+          max: config.HUSHMARK_RATE_LIMIT_MAX,
+          timeWindow: config.HUSHMARK_RATE_LIMIT_WINDOW_SEC * 1_000,
+        },
+      },
+      preHandler: authenticateGateway,
+    };
 
-  app.get("/healthz", { config: { hushmarkAuth: "public" } }, () => ({ status: "ok" }));
-  app.get("/readyz", { config: { hushmarkAuth: "public" } }, async (_request, reply) => {
-    const ready = (await core.ready?.()) ?? true;
-    void reply.status(ready ? 200 : 503);
-    return { status: ready ? "ready" : "loading" };
-  });
-  const tenantFor = (request: FastifyRequest): string => {
-    const tenantId = tenantByRequest.get(request);
-    if (tenantId === undefined) throw new GatewayError("HM-4010", "missing gateway identity");
-    return tenantId;
-  };
-  app.post(
-    "/v1/chat/completions",
-    { config: { hushmarkAuth: "gateway" } },
-    async (request, reply) =>
+    app.get("/healthz", { config: { hushmarkAuth: "public" } }, () => ({ status: "ok" }));
+    app.get("/readyz", { config: { hushmarkAuth: "public" } }, async (_request, reply) => {
+      const ready = (await core.ready?.()) ?? true;
+      void reply.status(ready ? 200 : 503);
+      return { status: ready ? "ready" : "loading" };
+    });
+    const tenantFor = (request: FastifyRequest): string => {
+      const tenantId = tenantByRequest.get(request);
+      if (tenantId === undefined) throw new GatewayError("HM-4010", "missing gateway identity");
+      return tenantId;
+    };
+    app.post("/v1/chat/completions", gatewayRoute, async (request, reply) =>
       handleProvider(
         request,
         reply,
@@ -166,33 +176,34 @@ export function buildServer(dependencies: ServerDependencies): FastifyInstance {
         config.HUSHMARK_STREAM_MAX_STATES,
         dependencies.onSecurityEvent,
       ),
-  );
-  app.post("/v1/messages", { config: { hushmarkAuth: "gateway" } }, async (request, reply) =>
-    handleProvider(
-      request,
-      reply,
-      new AnthropicAdapter(),
-      core,
-      upstream,
-      vault,
-      dependencies.policy,
-      dependencies.policyForTenant,
-      onMaskEvent,
-      config.HUSHMARK_VAULT_TTL_SEC,
-      tenantFor(request),
-      config.HUSHMARK_UNMASK_LIMIT,
-      config.HUSHMARK_UPSTREAM_MAX_RESPONSE_BYTES,
-      config.HUSHMARK_STREAM_MAX_BUFFER_BYTES,
-      config.HUSHMARK_STREAM_MAX_STATES,
-      dependencies.onSecurityEvent,
-    ),
-  );
-  app.setNotFoundHandler(() => {
-    throw new GatewayError("HM-4001", "unsupported provider route");
-  });
+    );
+    app.post("/v1/messages", gatewayRoute, async (request, reply) =>
+      handleProvider(
+        request,
+        reply,
+        new AnthropicAdapter(),
+        core,
+        upstream,
+        vault,
+        dependencies.policy,
+        dependencies.policyForTenant,
+        onMaskEvent,
+        config.HUSHMARK_VAULT_TTL_SEC,
+        tenantFor(request),
+        config.HUSHMARK_UNMASK_LIMIT,
+        config.HUSHMARK_UPSTREAM_MAX_RESPONSE_BYTES,
+        config.HUSHMARK_STREAM_MAX_BUFFER_BYTES,
+        config.HUSHMARK_STREAM_MAX_STATES,
+        dependencies.onSecurityEvent,
+      ),
+    );
+    app.setNotFoundHandler(() => {
+      throw new GatewayError("HM-4001", "unsupported provider route");
+    });
 
-  app.addHook("onClose", async () => {
-    await core.close?.();
+    app.addHook("onClose", async () => {
+      await core.close?.();
+    });
   });
   return app;
 }
