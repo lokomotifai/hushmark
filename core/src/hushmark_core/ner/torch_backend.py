@@ -31,7 +31,7 @@ class TorchNerBackend:
         self._spec = spec
         self._model: PredictingModel | None = None
         self._measured_sha256: str | None = None
-        self._label_to_type = {label: entity_type for entity_type, label in spec.labels.items()}
+        self._label_to_type = dict(spec.label_to_type)
 
     @property
     def model_id(self) -> str:
@@ -44,7 +44,7 @@ class TorchNerBackend:
     def load(self) -> None:
         if self._model is not None:
             return
-        model_file = self._model_dir / "pytorch_model.bin"
+        model_file = self._model_dir / self._spec.weight_file
         if not model_file.is_file():
             raise FileNotFoundError(
                 f"model weights are not installed at {self._model_dir}; run scripts/fetch-models.py"

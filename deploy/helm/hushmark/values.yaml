@@ -23,6 +23,7 @@ core:
       memory: 6Gi
   nerBackend: onnx
   nerThreshold: 0.55
+  modelId: hushmark-tr
   bodyLimitBytes: 1048576
   maxConcurrency: 4
   queueTimeoutMs: 250

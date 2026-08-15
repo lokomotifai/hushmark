@@ -100,7 +100,8 @@ described in the [security model](docs/security.md); do not treat a floating tag
 Hushmark is an early `0.1.x` release. The repository includes synthetic benchmark evidence and
 deployment tests, but those results do not establish accuracy on every organization’s traffic.
 Known limitations and next priorities are tracked in the [roadmap](ROADMAP.md) and
-[model card](docs/model-card-hushmark-tr.md).
+[model card](docs/model-card-hushmark-tr.md). The detector model is selectable; see the
+[model selection guide](docs/models.md).
 
 ## Community and license
 

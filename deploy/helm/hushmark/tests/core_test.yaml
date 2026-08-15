@@ -34,3 +34,21 @@ tests:
           path: spec.template.spec.containers[0].image
           value: hushmark/core@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
         documentIndex: 0
+  - it: selects the default model and honors overrides
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: HUSHMARK_CORE_MODEL_ID
+            value: hushmark-tr
+        documentIndex: 0
+  - it: renders an overridden model id
+    set:
+      core.modelId: gliner_multi_pii-v1
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: HUSHMARK_CORE_MODEL_ID
+            value: gliner_multi_pii-v1
+        documentIndex: 0

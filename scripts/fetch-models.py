@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import argparse
 import hashlib
 import json
 import shutil
@@ -16,6 +17,7 @@ import yaml
 ROOT = Path(__file__).resolve().parents[1]
 REGISTRY = ROOT / "core" / "models.yaml"
 MODEL_ROOT = ROOT / "models"
+NOTICE_EXEMPT_LICENSES = {"Apache-2.0", "MIT"}
 
 
 def sha256_file(path: Path) -> str:
@@ -47,13 +49,48 @@ def download_file(url: str, target: Path, spec: dict[str, Any]) -> None:
     partial.replace(target)
 
 
+def select_model_ids(models: list[dict[str, Any]], requested: list[str]) -> list[str]:
+    models_by_id = {model["id"]: model for model in models}
+    if requested:
+        unknown = [model_id for model_id in requested if model_id not in models_by_id]
+        if unknown:
+            raise ValueError(
+                f"unknown model ids: {', '.join(unknown)}; registry ids: {', '.join(models_by_id)}"
+            )
+        selected = list(dict.fromkeys(requested))
+    else:
+        selected = [model["id"] for model in models if not model.get("optional", False)]
+    expanded: list[str] = []
+    for model_id in selected:
+        if model_id not in expanded:
+            expanded.append(model_id)
+        runtime_config = models_by_id[model_id].get("runtime_config")
+        if runtime_config is not None:
+            tokenizer_model_id = runtime_config["tokenizer_model"]
+            if tokenizer_model_id not in expanded:
+                expanded.append(tokenizer_model_id)
+    return expanded
+
+
 def main() -> int:
+    parser = argparse.ArgumentParser(
+        description="Fetch pinned model files and verify their declared size and SHA-256."
+    )
+    parser.add_argument(
+        "model_ids",
+        nargs="*",
+        help="registry model ids to fetch (default: every model not marked optional)",
+    )
+    args = parser.parse_args()
     registry = yaml.safe_load(REGISTRY.read_text(encoding="utf-8"))
     models = registry.get("models") if isinstance(registry, dict) else None
     if not isinstance(models, list) or not models:
         raise ValueError("core/models.yaml must define a non-empty models list")
+    selected_ids = select_model_ids(models, args.model_ids)
     for model in models:
         model_id = model["id"]
+        if model_id not in selected_ids:
+            continue
         source = model["source"]
         revision = model["revision"]
         target_dir = MODEL_ROOT / model_id
@@ -64,6 +101,13 @@ def main() -> int:
         if local_artifact and not target_dir.is_dir():
             print(f"skipping unpublished local model artifact: {target_dir.relative_to(ROOT)}")
             continue
+        license_name = str(model.get("license", "unknown"))
+        if not local_artifact and license_name not in NOTICE_EXEMPT_LICENSES:
+            print(
+                f"notice: {model_id} is licensed {license_name}; the weights are downloaded "
+                "directly from the upstream source under that license and are not "
+                "redistributed by hushmark"
+            )
         target_dir.mkdir(parents=True, exist_ok=True)
         for file_spec in model["files"]:
             target = target_dir / file_spec["path"]
@@ -82,6 +126,8 @@ def main() -> int:
     models_by_id = {model["id"]: model for model in models}
     for model in models:
         model_id = model["id"]
+        if model_id not in selected_ids:
+            continue
         target_dir = MODEL_ROOT / model_id
         if model.get("distribution") == "local-artifact" and not target_dir.is_dir():
             continue

@@ -45,6 +45,11 @@ tokenizer_config.json
 
 `scripts/production/preflight.sh` verifies all four adopted checksums before Docker can start.
 
+To run a different registry model, set `HUSHMARK_CORE_MODEL_ID` (and `HUSHMARK_CORE_NER_BACKEND`
+for torch-only models) in `/etc/hushmark/production.env` and place that model's verified files
+under `/srv/hushmark/models/<model-id>/`; see `docs/models.md` for the selectable models and
+their constraints.
+
 ## Prepare without deploying
 
 Clone the repository into `/opt/hushmark/repo` and check out the approved release ref. Create the host directories with root-only

@@ -75,6 +75,10 @@ read-only to the core workload:
 Verify the local model checksum against the adopted release evidence before copying it to the
 volume. Do not publish the model directory to the public container registry.
 
+To run a different registry model, set `core.modelId` and place that model's verified files
+under `/models/<model-id>/` in the same claim; see `docs/models.md` for the selectable models
+and their constraints.
+
 The manual `Deploy shared Kubernetes` workflow has two modes. `plan` validates and renders without
 cluster credentials. `apply` uses the protected `shared-production` GitHub environment and requires
 these environment secrets:

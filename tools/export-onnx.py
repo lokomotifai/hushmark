@@ -21,11 +21,16 @@ def main() -> int:
     args = parser.parse_args()
     model_dir = ROOT / "models" / args.model_id
     spec = load_model_spec(ROOT / "core" / "models.yaml", args.model_id)
+    pinned_onnx_file = spec.onnx_file
+    pinned_onnx_size = spec.onnx_size
+    pinned_onnx_sha256 = spec.onnx_sha256
+    if pinned_onnx_file is None or pinned_onnx_size is None or pinned_onnx_sha256 is None:
+        raise RuntimeError(f"model {args.model_id} has no pinned ONNX export in core/models.yaml")
     output = model_dir / args.output
-    if args.output != spec.onnx_file:
+    if args.output != pinned_onnx_file:
         raise RuntimeError("ONNX output filename is not pinned in core/models.yaml")
     if args.verify_only:
-        verify_export(output, spec.onnx_size, spec.onnx_sha256)
+        verify_export(output, pinned_onnx_size, pinned_onnx_sha256)
         print(output)
         return 0
     if spec.distribution == "local-artifact":
@@ -46,7 +51,7 @@ def main() -> int:
     )
     if not output.is_file():
         raise RuntimeError(f"ONNX exporter did not produce {output}: {result}")
-    verify_export(output, spec.onnx_size, spec.onnx_sha256)
+    verify_export(output, pinned_onnx_size, pinned_onnx_sha256)
     print(output)
     return 0
 

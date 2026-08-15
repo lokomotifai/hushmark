@@ -101,7 +101,7 @@ olarak kabul etmeyin.
 Hushmark erken aşamadaki bir `0.1.x` sürümüdür. Depoda sentetik benchmark kanıtları ve dağıtım
 testleri vardır; bu sonuçlar her kurumun trafiğinde aynı doğruluğu kanıtlamaz. Bilinen sınırlar ve
 sonraki öncelikler [yol haritasında](ROADMAP.md) ve [model kartında](docs/model-card-hushmark-tr.md)
-yer alır.
+yer alır. Algılayıcı model seçilebilir; [model seçim rehberine](docs/models.md) bakın.
 
 ## Topluluk ve lisans
 

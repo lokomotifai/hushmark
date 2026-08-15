@@ -2,25 +2,80 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
   "additionalProperties": false,
-  "required": ["core", "gateway", "console", "enterprise", "postgres", "networkPolicy"],
+  "required": [
+    "core",
+    "gateway",
+    "console",
+    "enterprise",
+    "postgres",
+    "networkPolicy"
+  ],
   "properties": {
-    "nameOverride": { "type": "string" },
-    "fullnameOverride": { "type": "string" },
-    "imagePullSecrets": { "type": "array", "items": { "type": "object" } },
-    "core": { "$ref": "#/$defs/workloadCore" },
-    "gateway": { "$ref": "#/$defs/workloadGateway" },
-    "console": { "$ref": "#/$defs/workloadConsole" },
-    "enterprise": { "$ref": "#/$defs/enterprise" },
-    "postgres": { "$ref": "#/$defs/postgres" },
+    "nameOverride": {
+      "type": "string"
+    },
+    "fullnameOverride": {
+      "type": "string"
+    },
+    "imagePullSecrets": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "core": {
+      "$ref": "#/$defs/workloadCore"
+    },
+    "gateway": {
+      "$ref": "#/$defs/workloadGateway"
+    },
+    "console": {
+      "$ref": "#/$defs/workloadConsole"
+    },
+    "enterprise": {
+      "$ref": "#/$defs/enterprise"
+    },
+    "postgres": {
+      "$ref": "#/$defs/postgres"
+    },
     "networkPolicy": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["enabled", "internalUpstreamPorts", "externalEgressCidrs", "externalEgressPorts"],
+      "required": [
+        "enabled",
+        "internalUpstreamPorts",
+        "externalEgressCidrs",
+        "externalEgressPorts"
+      ],
       "properties": {
-        "enabled": { "type": "boolean" },
-        "internalUpstreamPorts": { "type": "array", "items": { "type": "integer", "minimum": 1, "maximum": 65535 }, "uniqueItems": true },
-        "externalEgressCidrs": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
-        "externalEgressPorts": { "type": "array", "items": { "type": "integer", "minimum": 1, "maximum": 65535 }, "uniqueItems": true }
+        "enabled": {
+          "type": "boolean"
+        },
+        "internalUpstreamPorts": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 65535
+          },
+          "uniqueItems": true
+        },
+        "externalEgressCidrs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "externalEgressPorts": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 65535
+          },
+          "uniqueItems": true
+        }
       }
     }
   },
@@ -28,111 +83,355 @@
     "image": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["repository", "tag", "digest", "pullPolicy"],
+      "required": [
+        "repository",
+        "tag",
+        "digest",
+        "pullPolicy"
+      ],
       "properties": {
-        "repository": { "type": "string", "minLength": 1 },
-        "tag": { "type": "string", "minLength": 1 },
-        "digest": { "type": "string" },
-        "pullPolicy": { "enum": ["Always", "IfNotPresent", "Never"] }
+        "repository": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tag": {
+          "type": "string",
+          "minLength": 1
+        },
+        "digest": {
+          "type": "string"
+        },
+        "pullPolicy": {
+          "enum": [
+            "Always",
+            "IfNotPresent",
+            "Never"
+          ]
+        }
       }
     },
-    "resources": { "type": "object" },
+    "resources": {
+      "type": "object"
+    },
     "service": {
       "type": "object",
-      "required": ["port"],
+      "required": [
+        "port"
+      ],
       "properties": {
-        "type": { "enum": ["ClusterIP", "NodePort", "LoadBalancer"] },
-        "port": { "type": "integer", "minimum": 1, "maximum": 65535 }
+        "type": {
+          "enum": [
+            "ClusterIP",
+            "NodePort",
+            "LoadBalancer"
+          ]
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        }
       }
     },
     "workloadCore": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["replicaCount", "image", "model", "service", "resources", "nerBackend", "nerThreshold", "bodyLimitBytes", "maxConcurrency", "queueTimeoutMs"],
+      "required": [
+        "replicaCount",
+        "image",
+        "model",
+        "service",
+        "resources",
+        "nerBackend",
+        "nerThreshold",
+        "bodyLimitBytes",
+        "maxConcurrency",
+        "queueTimeoutMs",
+        "modelId"
+      ],
       "properties": {
-        "replicaCount": { "type": "integer", "minimum": 1 },
-        "image": { "$ref": "#/$defs/image" },
+        "replicaCount": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "image": {
+          "$ref": "#/$defs/image"
+        },
         "model": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["baked", "existingClaim"],
-          "properties": { "baked": { "type": "boolean" }, "existingClaim": { "type": "string" } }
+          "required": [
+            "baked",
+            "existingClaim"
+          ],
+          "properties": {
+            "baked": {
+              "type": "boolean"
+            },
+            "existingClaim": {
+              "type": "string"
+            }
+          }
         },
-        "service": { "$ref": "#/$defs/service" },
-        "resources": { "$ref": "#/$defs/resources" },
-        "nerBackend": { "enum": ["disabled", "torch", "onnx"] },
-        "nerThreshold": { "type": "number", "minimum": 0, "maximum": 1 },
-        "bodyLimitBytes": { "type": "integer", "minimum": 1, "maximum": 16777216 },
-        "maxConcurrency": { "type": "integer", "minimum": 1, "maximum": 128 },
-        "queueTimeoutMs": { "type": "integer", "minimum": 1, "maximum": 30000 }
+        "service": {
+          "$ref": "#/$defs/service"
+        },
+        "resources": {
+          "$ref": "#/$defs/resources"
+        },
+        "nerBackend": {
+          "enum": [
+            "disabled",
+            "torch",
+            "onnx"
+          ]
+        },
+        "nerThreshold": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "bodyLimitBytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 16777216
+        },
+        "maxConcurrency": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 128
+        },
+        "queueTimeoutMs": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 30000
+        },
+        "modelId": {
+          "type": "string",
+          "minLength": 1
+        }
       }
     },
     "workloadGateway": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["replicaCount", "image", "service", "existingSecret", "apiKeyKey", "openaiApiKeyKey", "anthropicApiKeyKey", "coreServiceTokenKey", "trustProxyHops", "unmaskLimit", "rateLimitMax", "rateLimitWindowSec", "bodyLimitBytes", "openaiUpstream", "anthropicUpstream", "resources"],
+      "required": [
+        "replicaCount",
+        "image",
+        "service",
+        "existingSecret",
+        "apiKeyKey",
+        "openaiApiKeyKey",
+        "anthropicApiKeyKey",
+        "coreServiceTokenKey",
+        "trustProxyHops",
+        "unmaskLimit",
+        "rateLimitMax",
+        "rateLimitWindowSec",
+        "bodyLimitBytes",
+        "openaiUpstream",
+        "anthropicUpstream",
+        "resources"
+      ],
       "properties": {
-        "replicaCount": { "type": "integer", "minimum": 1 },
-        "image": { "$ref": "#/$defs/image" },
-        "service": { "$ref": "#/$defs/service" },
-        "existingSecret": { "type": "string", "minLength": 1 },
-        "apiKeyKey": { "type": "string", "minLength": 1 },
-        "openaiApiKeyKey": { "type": "string", "minLength": 1 },
-        "anthropicApiKeyKey": { "type": "string", "minLength": 1 },
-        "coreServiceTokenKey": { "type": "string", "minLength": 1 },
-        "trustProxyHops": { "type": "integer", "minimum": 0, "maximum": 4 },
-        "unmaskLimit": { "type": "integer", "minimum": 1, "maximum": 1000 },
-        "rateLimitMax": { "type": "integer", "minimum": 1 },
-        "rateLimitWindowSec": { "type": "integer", "minimum": 1 },
-        "bodyLimitBytes": { "type": "integer", "minimum": 1 },
-        "openaiUpstream": { "type": "string", "format": "uri" },
-        "anthropicUpstream": { "type": "string", "format": "uri" },
-        "resources": { "$ref": "#/$defs/resources" }
+        "replicaCount": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "image": {
+          "$ref": "#/$defs/image"
+        },
+        "service": {
+          "$ref": "#/$defs/service"
+        },
+        "existingSecret": {
+          "type": "string",
+          "minLength": 1
+        },
+        "apiKeyKey": {
+          "type": "string",
+          "minLength": 1
+        },
+        "openaiApiKeyKey": {
+          "type": "string",
+          "minLength": 1
+        },
+        "anthropicApiKeyKey": {
+          "type": "string",
+          "minLength": 1
+        },
+        "coreServiceTokenKey": {
+          "type": "string",
+          "minLength": 1
+        },
+        "trustProxyHops": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4
+        },
+        "unmaskLimit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000
+        },
+        "rateLimitMax": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "rateLimitWindowSec": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "bodyLimitBytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "openaiUpstream": {
+          "type": "string",
+          "format": "uri"
+        },
+        "anthropicUpstream": {
+          "type": "string",
+          "format": "uri"
+        },
+        "resources": {
+          "$ref": "#/$defs/resources"
+        }
       }
     },
     "workloadConsole": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["enabled", "origin", "replicaCount", "image", "service", "resources"],
+      "required": [
+        "enabled",
+        "origin",
+        "replicaCount",
+        "image",
+        "service",
+        "resources"
+      ],
       "properties": {
-        "enabled": { "type": "boolean" },
-        "origin": { "type": "string", "format": "uri" },
-        "replicaCount": { "type": "integer", "minimum": 1 },
-        "image": { "$ref": "#/$defs/image" },
-        "service": { "$ref": "#/$defs/service" },
-        "resources": { "$ref": "#/$defs/resources" }
+        "enabled": {
+          "type": "boolean"
+        },
+        "origin": {
+          "type": "string",
+          "format": "uri"
+        },
+        "replicaCount": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "image": {
+          "$ref": "#/$defs/image"
+        },
+        "service": {
+          "$ref": "#/$defs/service"
+        },
+        "resources": {
+          "$ref": "#/$defs/resources"
+        }
       }
     },
     "enterprise": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["enabled", "evaluationMode", "licenseSecret", "licenseKey", "publicKeyKey", "databaseSecret", "databaseUrlKey", "adminEmail", "adminSecret", "adminPasswordKey", "auditHmacSecret", "auditHmacKey", "auditCheckpointExistingClaim", "auditCheckpointBootstrap", "kms"],
+      "required": [
+        "enabled",
+        "evaluationMode",
+        "licenseSecret",
+        "licenseKey",
+        "publicKeyKey",
+        "databaseSecret",
+        "databaseUrlKey",
+        "adminEmail",
+        "adminSecret",
+        "adminPasswordKey",
+        "auditHmacSecret",
+        "auditHmacKey",
+        "auditCheckpointExistingClaim",
+        "auditCheckpointBootstrap",
+        "kms"
+      ],
       "properties": {
-        "enabled": { "type": "boolean" },
-        "evaluationMode": { "type": "boolean" },
-        "licenseSecret": { "type": "string" },
-        "licenseKey": { "type": "string" },
-        "publicKeyKey": { "type": "string" },
-        "databaseSecret": { "type": "string" },
-        "databaseUrlKey": { "type": "string" },
-        "adminEmail": { "type": "string" },
-        "adminSecret": { "type": "string" },
-        "adminPasswordKey": { "type": "string" },
-        "auditHmacSecret": { "type": "string", "minLength": 1 },
-        "auditHmacKey": { "type": "string", "minLength": 1 },
-        "auditCheckpointExistingClaim": { "type": "string" },
-        "auditCheckpointBootstrap": { "type": "boolean" },
+        "enabled": {
+          "type": "boolean"
+        },
+        "evaluationMode": {
+          "type": "boolean"
+        },
+        "licenseSecret": {
+          "type": "string"
+        },
+        "licenseKey": {
+          "type": "string"
+        },
+        "publicKeyKey": {
+          "type": "string"
+        },
+        "databaseSecret": {
+          "type": "string"
+        },
+        "databaseUrlKey": {
+          "type": "string"
+        },
+        "adminEmail": {
+          "type": "string"
+        },
+        "adminSecret": {
+          "type": "string"
+        },
+        "adminPasswordKey": {
+          "type": "string"
+        },
+        "auditHmacSecret": {
+          "type": "string",
+          "minLength": 1
+        },
+        "auditHmacKey": {
+          "type": "string",
+          "minLength": 1
+        },
+        "auditCheckpointExistingClaim": {
+          "type": "string"
+        },
+        "auditCheckpointBootstrap": {
+          "type": "boolean"
+        },
         "kms": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["kind", "keyId", "secret", "tokenKey", "vaultAddress", "vaultTransitMount"],
+          "required": [
+            "kind",
+            "keyId",
+            "secret",
+            "tokenKey",
+            "vaultAddress",
+            "vaultTransitMount"
+          ],
           "properties": {
-            "kind": { "enum": ["vault", "azure", "gcp"] },
-            "keyId": { "type": "string" },
-            "secret": { "type": "string" },
-            "tokenKey": { "type": "string" },
-            "vaultAddress": { "type": "string" },
-            "vaultTransitMount": { "type": "string" }
+            "kind": {
+              "enum": [
+                "vault",
+                "azure",
+                "gcp"
+              ]
+            },
+            "keyId": {
+              "type": "string"
+            },
+            "secret": {
+              "type": "string"
+            },
+            "tokenKey": {
+              "type": "string"
+            },
+            "vaultAddress": {
+              "type": "string"
+            },
+            "vaultTransitMount": {
+              "type": "string"
+            }
           }
         }
       }
@@ -140,25 +439,58 @@
     "postgres": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["enabled", "image", "existingSecret", "passwordKey", "database", "username", "persistence", "resources"],
+      "required": [
+        "enabled",
+        "image",
+        "existingSecret",
+        "passwordKey",
+        "database",
+        "username",
+        "persistence",
+        "resources"
+      ],
       "properties": {
-        "enabled": { "type": "boolean" },
-        "image": { "$ref": "#/$defs/image" },
-        "existingSecret": { "type": "string" },
-        "passwordKey": { "type": "string" },
-        "database": { "type": "string" },
-        "username": { "type": "string" },
+        "enabled": {
+          "type": "boolean"
+        },
+        "image": {
+          "$ref": "#/$defs/image"
+        },
+        "existingSecret": {
+          "type": "string"
+        },
+        "passwordKey": {
+          "type": "string"
+        },
+        "database": {
+          "type": "string"
+        },
+        "username": {
+          "type": "string"
+        },
         "persistence": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["enabled", "size", "storageClass"],
+          "required": [
+            "enabled",
+            "size",
+            "storageClass"
+          ],
           "properties": {
-            "enabled": { "type": "boolean" },
-            "size": { "type": "string" },
-            "storageClass": { "type": "string" }
+            "enabled": {
+              "type": "boolean"
+            },
+            "size": {
+              "type": "string"
+            },
+            "storageClass": {
+              "type": "string"
+            }
           }
         },
-        "resources": { "$ref": "#/$defs/resources" }
+        "resources": {
+          "$ref": "#/$defs/resources"
+        }
       }
     }
   }
