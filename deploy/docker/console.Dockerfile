@@ -7,7 +7,7 @@ ENV NEXT_TELEMETRY_DISABLED=1 \
     PNPM_HOME=/pnpm \
     PATH=/pnpm:$PATH
 WORKDIR /workspace
-RUN corepack enable && corepack prepare pnpm@9.15.9 --activate
+RUN corepack enable && corepack prepare pnpm@10.34.4 --activate
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json turbo.json ./
 COPY packages/shared/package.json packages/shared/package.json
 COPY packages/gateway/package.json packages/gateway/package.json

@@ -6,7 +6,7 @@ FROM ${NODE_IMAGE} AS build
 ENV PNPM_HOME=/pnpm
 ENV PATH=$PNPM_HOME:$PATH
 WORKDIR /workspace
-RUN corepack enable && corepack prepare pnpm@9.15.9 --activate
+RUN corepack enable && corepack prepare pnpm@10.34.4 --activate
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json turbo.json ./
 COPY packages/shared/package.json packages/shared/package.json
 COPY packages/gateway/package.json packages/gateway/package.json
@@ -18,7 +18,7 @@ COPY packages/gateway-enterprise packages/gateway-enterprise
 RUN pnpm --filter @hushmark/shared build \
     && pnpm --filter @hushmark/gateway build \
     && pnpm --filter @hushmark/gateway-enterprise build \
-    && pnpm --filter @hushmark/gateway-enterprise deploy --prod /deploy
+    && pnpm --filter @hushmark/gateway-enterprise deploy --legacy --prod /deploy
 
 FROM ${NODE_IMAGE} AS runtime
 ARG HUSHMARK_UID=10001
