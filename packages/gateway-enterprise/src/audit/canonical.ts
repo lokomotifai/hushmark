@@ -16,6 +16,16 @@ export function sha256(value: string | Uint8Array): string {
   return createHash("sha256").update(value).digest("hex");
 }
 
+export function auditFingerprint(
+  value: string | Uint8Array,
+  integrityKey: string | Uint8Array,
+): string {
+  return createHmac("sha256", integrityKey)
+    .update("hushmark-audit-fingerprint-v1\0")
+    .update(value)
+    .digest("hex");
+}
+
 export function auditHash(
   eventWithoutHash: Omit<AuditRecord, "hash">,
   integrityKey: string | Uint8Array,

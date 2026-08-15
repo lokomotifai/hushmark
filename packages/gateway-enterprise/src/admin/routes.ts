@@ -4,7 +4,6 @@ import type { FastifyInstance, FastifyRequest } from "fastify";
 import { GatewayError, MemoryRateLimiter, type RateLimiter } from "@hushmark/gateway";
 import { z } from "zod";
 
-import { sha256 } from "../audit/canonical.js";
 import type { AuditStore } from "../audit/store.js";
 import type { AuditWriter } from "../audit/writer.js";
 import { auditNdjson } from "../audit/verify.js";
@@ -126,8 +125,8 @@ export function registerAdminRoutes(
     async (request, reply) => {
       const input = LoginSchema.parse(request.body);
       const normalizedEmail = input.email.normalize("NFC").toLowerCase();
-      const emailFingerprint = sha256(normalizedEmail);
-      const ipFingerprint = sha256(request.ip);
+      const emailFingerprint = dependencies.audit.fingerprint(normalizedEmail);
+      const ipFingerprint = dependencies.audit.fingerprint(request.ip);
       const globalKey = "admin-login-global";
       const ipKey = `admin-login-ip:${ipFingerprint}`;
       const accountKey = `admin-login-account:${emailFingerprint}`;
@@ -139,7 +138,7 @@ export function registerAdminRoutes(
           kind: "LOGIN_FAILED",
           actor: `anonymous:${emailFingerprint.slice(0, 16)}`,
           session_id: null,
-          request_sha256: sha256(`${ipFingerprint}\0rate-limited`),
+          request_sha256: dependencies.audit.fingerprint(`${ipFingerprint}\0rate-limited`),
           entities: [],
         });
         throw new GatewayError("HM-4290", "admin login rate limit exceeded");
@@ -158,8 +157,10 @@ export function registerAdminRoutes(
           kind: "LOGIN_FAILED",
           actor: `anonymous:${emailFingerprint.slice(0, 16)}`,
           session_id: null,
-          request_sha256: sha256(
-            `${ipFingerprint}\0${sha256(request.headers["user-agent"] ?? "unknown")}`,
+          request_sha256: dependencies.audit.fingerprint(
+            `${ipFingerprint}\0${dependencies.audit.fingerprint(
+              request.headers["user-agent"] ?? "unknown",
+            )}`,
           ),
           entities: [],
         });
@@ -175,7 +176,7 @@ export function registerAdminRoutes(
         kind: "LOGIN_OK",
         actor: `user:${user.id}`,
         session_id: null,
-        request_sha256: sha256(user.id),
+        request_sha256: dependencies.audit.fingerprint(user.id),
         entities: [],
       });
       return { user: { id: user.id, email: user.email, role: user.role } };
@@ -302,7 +303,7 @@ export function registerAdminRoutes(
         kind: "REQUEST_BLOCKED",
         actor: `user:${principal.userId}`,
         session_id: null,
-        request_sha256: sha256("admin-vault-rate-limited"),
+        request_sha256: dependencies.audit.fingerprint("admin-vault-rate-limited"),
         entities: [],
       });
       throw new GatewayError("HM-4290", "vault resolution rate limit exceeded");
@@ -390,7 +391,7 @@ async function auditAdminChange(
     kind,
     actor: `user:${principal.userId}`,
     session_id: null,
-    request_sha256: sha256(resourceId),
+    request_sha256: audit.fingerprint(resourceId),
     entities: [],
   });
 }

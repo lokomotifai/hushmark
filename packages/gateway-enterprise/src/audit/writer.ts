@@ -1,7 +1,7 @@
 import type { MaskEvent } from "@hushmark/gateway";
 
 import { assertIntegrityKey, type AuditCheckpointStore } from "./checkpoint.js";
-import { auditHash, GENESIS_HASH, sha256 } from "./canonical.js";
+import { auditFingerprint, auditHash, GENESIS_HASH, sha256 } from "./canonical.js";
 import type { AuditStore } from "./store.js";
 import { AuditInputSchema, type AuditInput, type AuditRecord } from "./types.js";
 import { verifyAuditChain, type VerifyResult } from "./verify.js";
@@ -47,6 +47,10 @@ export class AuditWriter {
     });
     this.#queue = task.catch(() => undefined);
     return task;
+  }
+
+  fingerprint(value: string | Uint8Array): string {
+    return auditFingerprint(value, this.integrityKey);
   }
 
   async verify(

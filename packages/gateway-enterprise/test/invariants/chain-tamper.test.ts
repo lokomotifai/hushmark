@@ -74,6 +74,29 @@ it("rejects a recomputed chain when the audit HMAC key is unavailable to the dat
   ).toBe(false);
 });
 
+it("uses a domain-separated keyed fingerprint for audit correlation values", () => {
+  const writer = new AuditWriter(
+    new MemoryAuditStore(),
+    "test-audit-integrity-key-at-least-32-bytes",
+    new MemoryAuditCheckpointStore(),
+  );
+  const sameKey = new AuditWriter(
+    new MemoryAuditStore(),
+    "test-audit-integrity-key-at-least-32-bytes",
+    new MemoryAuditCheckpointStore(),
+  );
+  const otherKey = new AuditWriter(
+    new MemoryAuditStore(),
+    "other-audit-integrity-key-at-least-32-bytes",
+    new MemoryAuditCheckpointStore(),
+  );
+
+  expect(writer.fingerprint("api-key-id")).toMatch(/^[0-9a-f]{64}$/u);
+  expect(writer.fingerprint("api-key-id")).toBe(sameKey.fingerprint("api-key-id"));
+  expect(writer.fingerprint("api-key-id")).not.toBe(otherKey.fingerprint("api-key-id"));
+  expect(writer.fingerprint("api-key-id")).not.toBe(sha256("api-key-id"));
+});
+
 it("rejects a valid HMAC chain whose externally checkpointed tail was deleted", async () => {
   const store = new MemoryAuditStore();
   const integrityKey = new Uint8Array(32).fill(5);
