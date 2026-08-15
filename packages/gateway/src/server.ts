@@ -21,12 +21,7 @@ import { MemoryRateLimiter, type RateLimiter } from "./rateLimit.js";
 import { transformSse } from "./streaming/sse.js";
 import { unmaskText } from "./streaming/unmasker.js";
 import { HttpUpstream, type UpstreamPort } from "./upstream.js";
-import {
-  MemoryVault,
-  type PlaceholderVault,
-  type VaultScope,
-  type VaultStore,
-} from "./vault/memory.js";
+import { MemoryVault, type PlaceholderVault, type VaultScope } from "./vault/memory.js";
 
 export interface ServerDependencies {
   config: GatewayConfig;
@@ -38,6 +33,7 @@ export interface ServerDependencies {
   authenticateApiKey?: (key: string) => Promise<string | null>;
   rateLimiter?: RateLimiter;
   onSecurityEvent?: (event: GatewaySecurityEvent) => Promise<void> | void;
+  policyForTenant?: (tenantId: string) => Promise<StaticPolicy>;
   logger?: boolean;
 }
 
@@ -53,7 +49,10 @@ export function buildServer(dependencies: ServerDependencies): FastifyInstance {
     logger: dependencies.logger ?? false,
     logController: new LogController({ disableRequestLogging: true }),
     bodyLimit: dependencies.config.HUSHMARK_BODY_LIMIT_BYTES,
-    trustProxy: dependencies.config.HUSHMARK_TRUST_PROXY,
+    trustProxy:
+      dependencies.config.HUSHMARK_TRUST_PROXY_HOPS === 0
+        ? false
+        : dependencies.config.HUSHMARK_TRUST_PROXY_HOPS,
   });
   const config = dependencies.config;
   const apiKeys = config.HUSHMARK_API_KEYS;
@@ -68,13 +67,7 @@ export function buildServer(dependencies: ServerDependencies): FastifyInstance {
     new MemoryVault(config.HUSHMARK_VAULT_MAX_ENTRIES, Date.now, (event) => {
       app.log.warn(event);
     });
-  const pipeline = new MaskPipeline(
-    core,
-    dependencies.policy,
-    vault,
-    config.HUSHMARK_VAULT_TTL_SEC,
-    dependencies.onMaskEvent ?? ((event) => app.log.info(event)),
-  );
+  const onMaskEvent = dependencies.onMaskEvent ?? ((event: MaskEvent) => app.log.info(event));
 
   app.setErrorHandler((error, _request, reply) => {
     if (error instanceof GatewayError) {
@@ -159,12 +152,18 @@ export function buildServer(dependencies: ServerDependencies): FastifyInstance {
         request,
         reply,
         new OpenAiAdapter(),
-        pipeline,
+        core,
         upstream,
         vault,
         dependencies.policy,
+        dependencies.policyForTenant,
+        onMaskEvent,
+        config.HUSHMARK_VAULT_TTL_SEC,
         tenantFor(request),
         config.HUSHMARK_UNMASK_LIMIT,
+        config.HUSHMARK_UPSTREAM_MAX_RESPONSE_BYTES,
+        config.HUSHMARK_STREAM_MAX_BUFFER_BYTES,
+        config.HUSHMARK_STREAM_MAX_STATES,
         dependencies.onSecurityEvent,
       ),
   );
@@ -173,12 +172,18 @@ export function buildServer(dependencies: ServerDependencies): FastifyInstance {
       request,
       reply,
       new AnthropicAdapter(),
-      pipeline,
+      core,
       upstream,
       vault,
       dependencies.policy,
+      dependencies.policyForTenant,
+      onMaskEvent,
+      config.HUSHMARK_VAULT_TTL_SEC,
       tenantFor(request),
       config.HUSHMARK_UNMASK_LIMIT,
+      config.HUSHMARK_UPSTREAM_MAX_RESPONSE_BYTES,
+      config.HUSHMARK_STREAM_MAX_BUFFER_BYTES,
+      config.HUSHMARK_STREAM_MAX_STATES,
       dependencies.onSecurityEvent,
     ),
   );
@@ -196,14 +201,22 @@ async function handleProvider(
   request: FastifyRequest,
   reply: FastifyReply,
   adapter: ProviderAdapter,
-  pipeline: MaskPipeline,
+  core: CorePort,
   upstream: UpstreamPort,
-  vault: VaultStore,
-  policy: StaticPolicy,
+  vault: PlaceholderVault,
+  fallbackPolicy: StaticPolicy,
+  policyForTenant: ((tenantId: string) => Promise<StaticPolicy>) | undefined,
+  onMaskEvent: (event: MaskEvent) => Promise<void> | void,
+  vaultTtlSec: number,
   tenantId: string,
   unmaskLimit: number,
+  upstreamMaxResponseBytes: number,
+  streamMaxBufferBytes: number,
+  streamMaxStates: number,
   onSecurityEvent?: (event: GatewaySecurityEvent) => Promise<void> | void,
 ): Promise<unknown> {
+  const policy = policyForTenant === undefined ? fallbackPolicy : await policyForTenant(tenantId);
+  const pipeline = new MaskPipeline(core, policy, vault, vaultTtlSec, onMaskEvent);
   const parsed = adapter.parseRequest(request.body);
   if (parsed.stream && policy.defaults.response_scan === "buffered") {
     throw new GatewayError("HM-4203", "buffered response scan is incompatible with streaming");
@@ -235,10 +248,15 @@ async function handleProvider(
     reply.header("content-type", "text/event-stream; charset=utf-8");
     reply.header("cache-control", "no-cache");
     return reply.send(
-      Readable.from(transformSse(response.body, adapter, scope, vault, authorization)),
+      Readable.from(
+        transformSse(response.body, adapter, scope, vault, authorization, {
+          maxBufferBytes: streamMaxBufferBytes,
+          maxStates: streamMaxStates,
+        }),
+      ),
     );
   }
-  const upstreamBody = await response.body.json();
+  const upstreamBody = await readJsonBody(response.body, upstreamMaxResponseBytes);
   const restored = await adapter.unmaskResponse(upstreamBody, (text) =>
     unmaskText(text, scope, vault, authorization),
   );
@@ -246,6 +264,21 @@ async function handleProvider(
     await pipeline.apply(adapter.responseSegments(restored), scope);
   }
   return restored;
+}
+
+async function readJsonBody(body: AsyncIterable<Uint8Array>, maxBytes: number): Promise<unknown> {
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for await (const chunk of body) {
+    total += chunk.byteLength;
+    if (total > maxBytes) throw new GatewayError("HM-5001", "upstream provider error");
+    chunks.push(chunk);
+  }
+  try {
+    return JSON.parse(Buffer.concat(chunks).toString("utf8"));
+  } catch {
+    throw new GatewayError("HM-5001", "upstream provider error");
+  }
 }
 
 function apiKeyId(key: string): string {

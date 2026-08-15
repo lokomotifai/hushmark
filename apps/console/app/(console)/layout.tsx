@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import type { ReactNode } from "react";
 
@@ -15,6 +17,8 @@ const nav = [
 ] as const;
 
 export default async function ConsoleLayout({ children }: Readonly<{ children: ReactNode }>) {
+  const cookieStore = await cookies();
+  if (cookieStore.get("hm_admin") === undefined) redirect("/login");
   const t = await getTranslations("Nav");
   return (
     <div className="console-shell">

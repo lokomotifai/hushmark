@@ -1,14 +1,16 @@
 from __future__ import annotations
 
 import string
+import time
 
 import pytest
-from hushmark_core.recognizers.credit_card import validate_credit_card
+from hushmark_core.recognizers.credit_card import detect_credit_card, validate_credit_card
 from hushmark_core.recognizers.email import validate_email
 from hushmark_core.recognizers.iban import validate_iban
-from hushmark_core.recognizers.phone import LANDLINE_PREFIXES, validate_tr_phone
+from hushmark_core.recognizers.phone import LANDLINE_PREFIXES, detect_tr_phone, validate_tr_phone
 from hushmark_core.recognizers.plate import validate_tr_plate
 from hushmark_core.recognizers.secrets import (
+    detect_secrets,
     validate_api_key,
     validate_jwt,
     validate_private_key,
@@ -137,6 +139,15 @@ def test_credit_card_rejects_invalid_checksum_vectors(value: str) -> None:
     assert not validate_credit_card(value)
 
 
+@pytest.mark.parametrize("base", [0x0660, 0x06F0, 0xFF10])
+def test_credit_card_detects_unicode_decimal_digits(base: int) -> None:
+    value = VALID_CARDS[0]
+    rendered = "".join(chr(base + int(char)) for char in value)
+    hits = detect_credit_card(f"Kart: {rendered}")
+    assert len(hits) == 1
+    assert hits[0].end - hits[0].start == len(rendered)
+
+
 @pytest.mark.parametrize("value", VALID_PHONES)
 def test_phone_accepts_valid_vectors(value: str) -> None:
     assert validate_tr_phone(value)
@@ -145,6 +156,15 @@ def test_phone_accepts_valid_vectors(value: str) -> None:
 @pytest.mark.parametrize("value", [f"+90 999 {index:07d}" for index in range(20)])
 def test_phone_rejects_invalid_prefix_vectors(value: str) -> None:
     assert not validate_tr_phone(value)
+
+
+@pytest.mark.parametrize("base", [0x0660, 0x06F0, 0xFF10])
+def test_phone_detects_unicode_decimal_digits(base: int) -> None:
+    value = "05321234567"
+    rendered = "".join(chr(base + int(char)) for char in value)
+    hits = detect_tr_phone(f"Telefon: {rendered}")
+    assert len(hits) == 1
+    assert hits[0].end - hits[0].start == len(rendered)
 
 
 @pytest.mark.parametrize("value", VALID_PLATES)
@@ -216,3 +236,10 @@ def test_private_key_rejects_mismatched_pem_vectors(index: int) -> None:
     payload = (f"QUJDREVGR0hJSktMTU5PUFFSU1RVVldYWVo{index:02d}" * 2)[:64]
     value = f"-----BEGIN RSA PRIVATE KEY-----\n{payload}\n-----END PRIVATE KEY-----"
     assert not validate_private_key(value)
+
+
+def test_private_key_scanner_rejects_adversarial_whitespace_in_linear_time() -> None:
+    value = "-----BEGIN PRIVATE KEY-----\n" + ("\n" * 32_000)
+    start = time.perf_counter()
+    assert detect_secrets(value) == []
+    assert time.perf_counter() - start < 0.5

@@ -26,9 +26,14 @@ kubectl -n hushmark create secret generic hushmark-gateway \
 
 For enterprise mode, also create the license/public-key, database, admin, audit-HMAC, and KMS
 secrets named by the chart values. Do not place plaintext secret values in a committed values file.
+Create a dedicated persistent volume claim for the append-only audit checkpoint and set
+`enterprise.auditCheckpointExistingClaim` to its name. Keep that volume under different access
+control from PostgreSQL. Existing audit rows can be anchored once with
+`enterprise.auditCheckpointBootstrap=true`; return it to `false` immediately after a successful
+start.
 The enterprise process applies packaged database migrations under a PostgreSQL advisory lock at
 startup. The security-hardening migration intentionally deletes legacy, tenantless vault rows;
-drain active conversations before upgrading from an earlier v0.1.0 checkout.
+drain active conversations before upgrading from an earlier v0.1.1 checkout.
 
 ## Install
 
@@ -36,9 +41,9 @@ drain active conversations before upgrading from an earlier v0.1.0 checkout.
 helm upgrade --install hushmark deploy/helm/hushmark \
   --namespace hushmark \
   --set core.image.repository=internal.example/hushmark/core \
-  --set core.image.tag=0.1.0-model \
+  --set core.image.tag=0.1.1-model \
   --set gateway.image.repository=internal.example/hushmark/gateway \
-  --set gateway.image.tag=0.1.0 \
+  --set gateway.image.tag=0.1.1 \
   --wait --timeout 10m
 ```
 
@@ -46,11 +51,13 @@ Verify `deployment/hushmark-core` and `deployment/hushmark-gateway` readiness. E
 gateway through an authenticated internal ingress. The core Service must remain `ClusterIP`.
 When NetworkPolicy is enabled, label the ingress controller namespace with
 `hushmark.ai/gateway-access=true`; only that namespace and the Hushmark console pods may reach the
-gateway.
+gateway. The chart denies egress by default. Prefer a same-namespace egress proxy labelled
+`hushmark.ai/gateway-upstream=true`; if direct provider access is unavoidable, explicitly set
+`networkPolicy.externalEgressCidrs` and keep `externalEgressPorts` restricted to `443`.
 
 ## Shared-cluster release
 
-`values.shared.yaml` pins the three published v0.1.0 GHCR images by their verified manifest
+`values.shared.yaml` pins the three published v0.1.1 GHCR images by their verified manifest
 digests. It deploys the open-core core and gateway only; the console, enterprise features, and
 bundled PostgreSQL remain disabled.
 

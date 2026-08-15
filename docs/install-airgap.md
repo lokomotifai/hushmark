@@ -1,6 +1,6 @@
 # Install from the air-gap bundle
 
-`dist/hushmark-airgap-0.1.0.tar` contains the three Hushmark images, the Helm chart, verified ONNX
+`dist/hushmark-airgap-0.1.1.tar` contains the three Hushmark images, the Helm chart, verified ONNX
 model files, evaluation fixtures, an installer, and a SHA-256 manifest. Dependency installation and
 image creation happen before the bundle crosses the offline boundary.
 
@@ -8,7 +8,7 @@ image creation happen before the bundle crosses the offline boundary.
 
 ```bash
 ./scripts/build-airgap.sh
-sha256sum dist/hushmark-airgap-0.1.0.tar
+sha256sum dist/hushmark-airgap-0.1.1.tar
 ```
 
 Transfer the tar and its out-of-band digest through the organization's approved media process.
@@ -17,7 +17,7 @@ Transfer the tar and its out-of-band digest through the organization's approved 
 
 ```bash
 mkdir hushmark-airgap
-tar -xf hushmark-airgap-0.1.0.tar -C hushmark-airgap
+tar -xf hushmark-airgap-0.1.1.tar -C hushmark-airgap
 cd hushmark-airgap
 sha256sum -c SHA256SUMS
 ./install.sh --load-only
@@ -34,12 +34,12 @@ evaluation profile with `imagePullPolicy: Never`:
 The acceptance harness performs the complete sequence and rejects any workload image pull event:
 
 ```bash
-./scripts/e2e-kind.sh --airgap dist/hushmark-airgap-0.1.0.tar
+./scripts/e2e-kind.sh --airgap dist/hushmark-airgap-0.1.1.tar
 ```
 
 For another Kubernetes distribution, import `images.tar` into every node or an approved internal
 registry, create the gateway secret, adjust the image repository/tag values, then install
-`chart/hushmark-0.1.0.tgz`. The default evaluation key and fake upstream must not be used in
+`chart/hushmark-0.1.1.tgz`. The default evaluation key and fake upstream must not be used in
 production.
 
 The bundle carries development/evaluation signing evidence only. Validate the delivery digest and

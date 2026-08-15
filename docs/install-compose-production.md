@@ -15,7 +15,7 @@ The pilot topology contains only three containers:
 - `gateway`, reachable only by the edge proxy and authenticated with `hm_k1_...` client keys; and
 - Caddy, the sole public service, terminating HTTPS on ports 80 and 443.
 
-The Hushmark images are pinned to their signed v0.1.0 manifest digests, and the official Caddy
+The Hushmark images are pinned to their signed v0.1.1 manifest digests, and the official Caddy
 image is pinned by digest. Evaluation PostgreSQL, Vault dev mode, the fake provider, bundled
 passwords, the enterprise console, and model weights are not present.
 

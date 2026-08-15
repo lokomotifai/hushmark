@@ -1,6 +1,6 @@
 {
   "name": "@hushmark/shared",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Shared public schemas and taxonomy types for Hushmark integrations",
   "type": "module",
   "license": "Apache-2.0",

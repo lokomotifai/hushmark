@@ -20,6 +20,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
+HUSHMARK_CORE_ALLOW_UNAUTHENTICATED=true \
 HUSHMARK_CORE_NER_BACKEND=disabled HUSHMARK_CORE_PORT=8000 \
   uv run --frozen --package hushmark-core hushmark-core >"$run_dir/core.log" 2>&1 &
 processes+=("$!")

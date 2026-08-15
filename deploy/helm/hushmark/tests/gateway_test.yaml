@@ -23,6 +23,7 @@ tests:
   - it: selects enterprise entrypoint only when enabled
     set:
       enterprise.enabled: true
+      enterprise.auditCheckpointExistingClaim: hushmark-audit-checkpoint
     asserts:
       - equal:
           path: spec.template.spec.containers[0].args[0]
@@ -38,6 +39,7 @@ tests:
     set:
       enterprise.enabled: true
       enterprise.evaluationMode: true
+      enterprise.auditCheckpointExistingClaim: hushmark-audit-checkpoint
     asserts:
       - contains:
           path: spec.template.spec.containers[0].env

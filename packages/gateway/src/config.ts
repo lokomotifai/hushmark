@@ -28,10 +28,26 @@ export const EnvSchema = z
     HUSHMARK_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(120),
     HUSHMARK_RATE_LIMIT_WINDOW_SEC: z.coerce.number().int().positive().default(60),
     HUSHMARK_BODY_LIMIT_BYTES: z.coerce.number().int().positive().default(1_048_576),
-    HUSHMARK_TRUST_PROXY: z
-      .enum(["true", "false"])
-      .default("false")
-      .transform((value) => value === "true"),
+    HUSHMARK_UPSTREAM_MAX_RESPONSE_BYTES: z.coerce
+      .number()
+      .int()
+      .min(1_024)
+      .max(67_108_864)
+      .default(8_388_608),
+    HUSHMARK_UPSTREAM_BODY_TIMEOUT_MS: z.coerce
+      .number()
+      .int()
+      .min(1_000)
+      .max(600_000)
+      .default(60_000),
+    HUSHMARK_STREAM_MAX_BUFFER_BYTES: z.coerce
+      .number()
+      .int()
+      .min(1_024)
+      .max(16_777_216)
+      .default(1_048_576),
+    HUSHMARK_STREAM_MAX_STATES: z.coerce.number().int().min(1).max(1_024).default(128),
+    HUSHMARK_TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(4).default(0),
   })
   .strict();
 

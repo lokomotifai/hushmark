@@ -74,7 +74,22 @@ describe("public mirror extraction", () => {
       "./scripts/verify.sh",
     );
     expect(await readFile(join(output, ".github/workflows/release.yml"), "utf8")).toContain(
-      "npm publish dist/npm/hushmark-shared-0.1.0.tgz",
+      "npm publish dist/npm/hushmark-shared-0.1.1.tgz",
+    );
+    expect(await readFile(join(output, ".github/workflows/release.yml"), "utf8")).not.toContain(
+      "workflow_dispatch",
+    );
+    const supplyChain = await readFile(join(output, ".github/workflows/supply-chain.yml"), "utf8");
+    expect(supplyChain).toContain("open-core.spdx.json");
+    expect(supplyChain).toContain("uv export --all-packages --no-dev --frozen --no-emit-workspace");
+    expect(supplyChain).toContain("--no-deps --disable-pip --requirement");
+    expect(supplyChain).toContain('tarfile.open(tarball, "r:gz")');
+    expect(await readFile(join(output, "pnpm-workspace.yaml"), "utf8")).toContain(
+      '"esbuild@>=0.27.3 <0.28.1": 0.28.2',
+    );
+    const publicLock = await readFile(join(output, "pnpm-lock.yaml"), "utf8");
+    expect(publicLock).not.toMatch(
+      /gateway-enterprise|apps\/console|license-issuer|tools\/release/u,
     );
     await expect(
       readFile(join(output, "bench/train/outputs/smoke-verdict.json")),

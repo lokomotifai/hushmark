@@ -27,6 +27,7 @@ fi
 "$helm_cmd" template hushmark deploy/helm/hushmark >/dev/null
 "$helm_cmd" template hushmark deploy/helm/hushmark \
   --set enterprise.enabled=true \
+  --set enterprise.auditCheckpointExistingClaim=hushmark-audit-checkpoint \
   --set postgres.enabled=true \
   --set postgres.persistence.enabled=false >/dev/null
 

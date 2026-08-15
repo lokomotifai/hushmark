@@ -3,6 +3,7 @@ import { buildServer, type ServerDependencies, type StaticPolicy } from "@hushma
 
 import { registerAdminRoutes } from "./admin/routes.js";
 import type { AdminSessionStore } from "./admin/session.js";
+import type { AuditCheckpointStore } from "./audit/checkpoint.js";
 import { sha256 } from "./audit/canonical.js";
 import type { IdentityRepository } from "./admin/identity.js";
 import { MemoryAuditStore, type AuditStore } from "./audit/store.js";
@@ -33,7 +34,9 @@ export interface EnterpriseServerDependencies {
   sessions?: AdminSessionStore;
   clock?: Clock;
   nowMs?: () => number;
-  auditIntegrityKey?: string | Uint8Array;
+  auditIntegrityKey: string | Uint8Array;
+  auditCheckpointStore: AuditCheckpointStore;
+  allowAuditCheckpointBootstrap?: boolean;
   adminSecureCookies?: boolean;
 }
 
@@ -53,8 +56,10 @@ export async function buildEnterpriseServer(
   const auditStore = dependencies.auditStore ?? new MemoryAuditStore();
   const audit = new AuditWriter(
     auditStore,
-    dependencies.clock ?? systemClock,
     dependencies.auditIntegrityKey,
+    dependencies.auditCheckpointStore,
+    dependencies.clock ?? systemClock,
+    dependencies.allowAuditCheckpointBootstrap ?? false,
   );
   const license = new LicenseGuard(
     dependencies.publicKeyPem ?? EMBEDDED_LICENSE_PUBLIC_KEY,
@@ -62,13 +67,7 @@ export async function buildEnterpriseServer(
     audit,
   );
   if (!(await license.load(dependencies.signedLicense))) {
-    return {
-      app: buildServer(dependencies.gateway),
-      enterprise: false,
-      auditStore,
-      audit,
-      license,
-    };
+    throw new Error("enterprise license verification failed");
   }
 
   const vault = new KmsEnvelopeVault(
@@ -95,6 +94,7 @@ export async function buildEnterpriseServer(
         entities: [],
       });
     },
+    policyForTenant: (apiKeyId) => policies.resolve({ apiKeyId }),
     vault,
     onMaskEvent: (event) => audit.appendMaskEvent(event).then(() => undefined),
   });

@@ -78,15 +78,16 @@ if [[ -n "$airgap_archive" ]]; then
   exit 0
 fi
 
-docker build --target slim -f deploy/docker/core.Dockerfile -t hushmark/core:0.1.0 .
-docker build -f deploy/docker/gateway.Dockerfile -t hushmark/gateway:0.1.0 .
-docker build -f deploy/docker/console.Dockerfile -t hushmark/console:0.1.0 .
+docker build --target slim -f deploy/docker/core.Dockerfile -t hushmark/core:0.1.1 .
+docker build -f deploy/docker/gateway.Dockerfile -t hushmark/gateway:0.1.1 .
+docker build -f deploy/docker/console.Dockerfile -t hushmark/console:0.1.1 .
 
 kind create cluster --name "$cluster_name" --wait 120s
 kind load docker-image --name "$cluster_name" \
-  hushmark/core:0.1.0 hushmark/gateway:0.1.0 hushmark/console:0.1.0
+  hushmark/core:0.1.1 hushmark/gateway:0.1.1 hushmark/console:0.1.1
 
 kubectl create namespace "$namespace"
+kubectl label namespace "$namespace" hushmark.ai/gateway-access=true --overwrite
 kubectl -n "$namespace" create secret generic hushmark-gateway \
   --from-literal=api-keys=hm_k1_evaluation_local_key \
   --from-literal=openai-api-key=evaluation \
@@ -115,7 +116,7 @@ kubectl -n "$namespace" exec deployment/vault -- sh -ec \
 helm upgrade --install hushmark deploy/helm/hushmark \
   --namespace "$namespace" \
   --set fullnameOverride=hushmark \
-  --set core.image.tag=0.1.0 \
+  --set core.image.tag=0.1.1 \
   --set core.image.pullPolicy=Never \
   --set core.nerBackend=disabled \
   --set core.resources.requests.cpu=100m \
@@ -130,6 +131,7 @@ helm upgrade --install hushmark deploy/helm/hushmark \
   --set console.resources.requests.memory=128Mi \
   --set enterprise.enabled=true \
   --set enterprise.evaluationMode=true \
+  --set enterprise.auditCheckpointExistingClaim=hushmark-audit-checkpoint \
   --set enterprise.kms.vaultAddress=http://vault:8200 \
   --set postgres.enabled=true \
   --set postgres.persistence.enabled=false \

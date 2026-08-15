@@ -37,31 +37,40 @@ export class KmsEnvelopeVault implements PlaceholderVault {
   }
 
   async intern(scope: VaultScope, requested: string, record: VaultRecord): Promise<string> {
-    const records = await this.repository.listSession(scope);
-    const dataKey = await this.sessionKey(scope, records[0]);
-    const valueHmac = hmacValue(dataKey.key, record.type, record.value);
-    const duplicate = await this.repository.getByValueHmac(scope, record.type, valueHmac);
-    if (duplicate !== null && duplicate.expiresAt.getTime() > this.now()) {
-      return duplicate.placeholder;
+    const dataKey = await this.writeSessionKey(scope, await this.repository.getSessionKey(scope));
+    try {
+      const valueHmac = hmacValue(dataKey.key, record.type, record.value);
+      const duplicate = await this.repository.getByValueHmac(scope, record.type, valueHmac);
+      if (duplicate !== null && duplicate.expiresAt.getTime() > this.now()) {
+        return duplicate.placeholder;
+      }
+      const requestedParts = placeholderParts(requested, record.type);
+      const placeholder = await this.repository.allocatePlaceholder(
+        scope,
+        requestedParts.label,
+        requestedParts.suffix,
+        requestedParts.minimum,
+      );
+      const iv = randomBytes(12);
+      const cipher = createCipheriv("aes-256-gcm", dataKey.key, iv);
+      cipher.setAAD(aad(scope, placeholder, record.type));
+      const ciphertext = Buffer.concat([cipher.update(record.value, "utf8"), cipher.final()]);
+      await this.repository.put({
+        tenantId: scope.tenantId,
+        sessionId: scope.sessionId,
+        placeholder,
+        ciphertext,
+        iv,
+        tag: cipher.getAuthTag(),
+        wrappedKey: dataKey.wrapped,
+        entityType: record.type,
+        valueHmac,
+        expiresAt: new Date(this.now() + record.ttlSec * 1_000),
+      });
+      return placeholder;
+    } finally {
+      dataKey.key.fill(0);
     }
-    const placeholder = availablePlaceholder(requested, record.type, records);
-    const iv = randomBytes(12);
-    const cipher = createCipheriv("aes-256-gcm", dataKey.key, iv);
-    cipher.setAAD(aad(scope, placeholder, record.type));
-    const ciphertext = Buffer.concat([cipher.update(record.value, "utf8"), cipher.final()]);
-    await this.repository.put({
-      tenantId: scope.tenantId,
-      sessionId: scope.sessionId,
-      placeholder,
-      ciphertext,
-      iv,
-      tag: cipher.getAuthTag(),
-      wrappedKey: dataKey.wrapped,
-      entityType: record.type,
-      valueHmac,
-      expiresAt: new Date(this.now() + record.ttlSec * 1_000),
-    });
-    return placeholder;
   }
 
   resolve(scope: VaultScope, placeholder: string): Promise<string | null> {
@@ -112,43 +121,69 @@ export class KmsEnvelopeVault implements PlaceholderVault {
   private async decrypt(record: EncryptedVaultRecord): Promise<string> {
     try {
       const scope = { tenantId: record.tenantId, sessionId: record.sessionId };
-      const dataKey = await this.sessionKey(scope, record);
-      const decipher = createDecipheriv("aes-256-gcm", dataKey.key, record.iv);
-      decipher.setAAD(aad(scope, record.placeholder, record.entityType));
-      decipher.setAuthTag(record.tag);
-      return Buffer.concat([decipher.update(record.ciphertext), decipher.final()]).toString("utf8");
+      const dataKey = await this.keyForWrapped(scope, record.wrappedKey);
+      try {
+        const decipher = createDecipheriv("aes-256-gcm", dataKey.key, record.iv);
+        decipher.setAAD(aad(scope, record.placeholder, record.entityType));
+        decipher.setAuthTag(record.tag);
+        return Buffer.concat([decipher.update(record.ciphertext), decipher.final()]).toString(
+          "utf8",
+        );
+      } finally {
+        dataKey.key.fill(0);
+      }
     } catch (error) {
       if (error instanceof GatewayError) throw error;
       throw new GatewayError("HM-5040", "vault unavailable");
     }
   }
 
-  private async sessionKey(
+  private async writeSessionKey(
     scope: VaultScope,
-    existing: EncryptedVaultRecord | undefined,
+    existingWrapped: string | null,
+  ): Promise<{ key: Uint8Array; wrapped: string }> {
+    if (existingWrapped !== null) {
+      return this.keyForWrapped(scope, existingWrapped);
+    }
+    const candidate = await this.createDataKey();
+    const wrapped = await this.repository.claimSessionKey(scope, candidate.wrapped);
+    if (wrapped === candidate.wrapped) {
+      this.cacheKey(scope, wrapped, candidate.key);
+      const key = new Uint8Array(candidate.key);
+      candidate.key.fill(0);
+      return { key, wrapped };
+    }
+    candidate.key.fill(0);
+    return this.keyForWrapped(scope, wrapped);
+  }
+
+  private async keyForWrapped(
+    scope: VaultScope,
+    wrapped: string,
   ): Promise<{ key: Uint8Array; wrapped: string }> {
     this.evictExpiredKeys();
-    const cacheKey = scopeKey(scope);
+    const cacheKey = wrappedCacheKey(scope, wrapped);
     const cached = this.#dataKeys.get(cacheKey);
     if (cached !== undefined) {
       cached.lastUsed = this.now();
-      return cached;
+      return { key: new Uint8Array(cached.key), wrapped: cached.wrapped };
     }
-    const value =
-      existing === undefined
-        ? await this.createDataKey()
-        : {
-            key: await this.kms.unwrap(this.keyId, existing.wrappedKey),
-            wrapped: existing.wrappedKey,
-          };
-    if (value.key.byteLength !== 32) throw new GatewayError("HM-5040", "vault unavailable");
-    this.#dataKeys.set(cacheKey, {
-      ...value,
+    const key = await this.kms.unwrap(this.keyId, wrapped);
+    if (key.byteLength !== 32) throw new GatewayError("HM-5040", "vault unavailable");
+    this.cacheKey(scope, wrapped, key);
+    const result = new Uint8Array(key);
+    key.fill(0);
+    return { key: result, wrapped };
+  }
+
+  private cacheKey(scope: VaultScope, wrapped: string, key: Uint8Array): void {
+    this.#dataKeys.set(wrappedCacheKey(scope, wrapped), {
+      key: new Uint8Array(key),
+      wrapped,
       expiresAt: this.now() + this.keyCacheTtlMs,
       lastUsed: this.now(),
     });
     this.evictOverflowKeys();
-    return value;
   }
 
   private async createDataKey(): Promise<{ key: Uint8Array; wrapped: string }> {
@@ -179,21 +214,15 @@ export class KmsEnvelopeVault implements PlaceholderVault {
   }
 }
 
-function availablePlaceholder(
+function placeholderParts(
   requested: string,
   type: EntityType,
-  records: readonly EncryptedVaultRecord[],
-): string {
-  const occupied = new Set(records.map((record) => record.placeholder));
-  if (!occupied.has(requested)) return requested;
+): { label: string; suffix: string; minimum: number } {
   const match = PLACEHOLDER_PARTS.exec(requested);
   const label = match?.[1] ?? TAXONOMY[type].tr_label;
   const suffix = match?.[2] ?? "";
-  for (let index = 1; index <= 99_999; index += 1) {
-    const candidate = `[${label}_${String(index)}]${suffix}`;
-    if (!occupied.has(candidate)) return candidate;
-  }
-  throw new GatewayError("HM-5040", "vault unavailable");
+  const counter = /^\[[A-Z]{2,12}_([1-9][0-9]{0,4})\]/u.exec(requested)?.[1];
+  return { label, suffix, minimum: counter === undefined ? 1 : Number(counter) };
 }
 
 function aad(scope: VaultScope, placeholder: string, type: EntityType): Buffer {
@@ -202,6 +231,10 @@ function aad(scope: VaultScope, placeholder: string, type: EntityType): Buffer {
 
 function scopeKey(scope: VaultScope): string {
   return `${scope.tenantId}\0${scope.sessionId}`;
+}
+
+function wrappedCacheKey(scope: VaultScope, wrapped: string): string {
+  return `${scopeKey(scope)}\0${wrapped}`;
 }
 
 function hmacValue(key: Uint8Array, type: EntityType, value: string): string {

@@ -52,8 +52,8 @@ spec:
               value: {{ printf "http://%s-core:%v" (include "hushmark.fullname" .) .Values.core.service.port | quote }}
             - name: HUSHMARK_CORE_SERVICE_TOKEN
               valueFrom: { secretKeyRef: { name: {{ .Values.gateway.existingSecret }}, key: {{ .Values.gateway.coreServiceTokenKey }} } }
-            - name: HUSHMARK_TRUST_PROXY
-              value: {{ .Values.gateway.trustProxy | quote }}
+            - name: HUSHMARK_TRUST_PROXY_HOPS
+              value: {{ .Values.gateway.trustProxyHops | quote }}
             - name: HUSHMARK_UNMASK_LIMIT
               value: {{ .Values.gateway.unmaskLimit | quote }}
             - name: HUSHMARK_RATE_LIMIT_MAX
@@ -93,6 +93,10 @@ spec:
               value: {{ .Values.enterprise.kms.keyId | quote }}
             - name: HUSHMARK_AUDIT_HMAC_KEY_FILE
               value: /run/hushmark/audit/{{ .Values.enterprise.auditHmacKey }}
+            - name: HUSHMARK_AUDIT_CHECKPOINT_FILE
+              value: /var/lib/hushmark/audit-checkpoint/checkpoints.ndjson
+            - name: HUSHMARK_AUDIT_CHECKPOINT_BOOTSTRAP
+              value: {{ .Values.enterprise.auditCheckpointBootstrap | quote }}
             {{- if eq .Values.enterprise.kms.kind "vault" }}
             - name: HUSHMARK_VAULT_ADDR
               value: {{ .Values.enterprise.kms.vaultAddress | quote }}
@@ -119,6 +123,7 @@ spec:
             {{- if .Values.enterprise.enabled }}
             - { name: license, mountPath: /run/hushmark/license, readOnly: true }
             - { name: audit-integrity, mountPath: /run/hushmark/audit, readOnly: true }
+            - { name: audit-checkpoint, mountPath: /var/lib/hushmark/audit-checkpoint }
             {{- end }}
       volumes:
         - name: tmp
@@ -130,6 +135,9 @@ spec:
           secret: { secretName: {{ .Values.enterprise.licenseSecret }} }
         - name: audit-integrity
           secret: { secretName: {{ .Values.enterprise.auditHmacSecret }} }
+        - name: audit-checkpoint
+          persistentVolumeClaim:
+            claimName: {{ required "enterprise.auditCheckpointExistingClaim is required when enterprise mode is enabled" .Values.enterprise.auditCheckpointExistingClaim }}
         {{- end }}
 ---
 apiVersion: v1

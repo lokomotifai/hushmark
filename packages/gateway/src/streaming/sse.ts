@@ -1,6 +1,7 @@
 import type { ProviderAdapter, StreamField } from "../providers/types.js";
 import { isRecord } from "../providers/types.js";
 import { unmaskJsonDocument } from "../providers/content.js";
+import { GatewayError } from "../errors.js";
 import type { VaultScope, VaultStore } from "../vault/memory.js";
 import { StreamingUnmasker, type UnmaskAuthorization, unmaskText } from "./unmasker.js";
 
@@ -11,12 +12,20 @@ interface StreamState {
   jsonBuffer: string;
 }
 
+export interface StreamLimits {
+  maxBufferBytes: number;
+  maxStates: number;
+}
+
+const DEFAULT_LIMITS: StreamLimits = { maxBufferBytes: 1_048_576, maxStates: 128 };
+
 export async function* transformSse(
   source: AsyncIterable<Uint8Array>,
   adapter: ProviderAdapter,
   scope: VaultScope,
   vault: VaultStore,
   authorization: UnmaskAuthorization,
+  limits: StreamLimits = DEFAULT_LIMITS,
 ): AsyncGenerator<string> {
   const decoder = new TextDecoder();
   const states = new Map<string, StreamState>();
@@ -60,9 +69,10 @@ export async function* transformSse(
     if (terminal) return (await flushStates()) + frame + separator;
     const fields = adapter.streamFields(parsed);
     for (const field of fields) {
-      const state = stateFor(field, states, scope, vault, authorization);
+      const state = stateFor(field, states, scope, vault, authorization, limits.maxStates);
       if (state.format === "json") {
         state.jsonBuffer += field.text;
+        enforceBufferLimit(state.jsonBuffer, limits.maxBufferBytes);
         field.set("");
       } else {
         field.set(await state.unmasker.push(field.text));
@@ -76,6 +86,7 @@ export async function* transformSse(
 
   for await (const chunk of source) {
     pending += decoder.decode(chunk, { stream: true });
+    enforceBufferLimit(pending, limits.maxBufferBytes);
     for (;;) {
       const delimiter = /\r?\n\r?\n/u.exec(pending);
       if (delimiter === null) break;
@@ -95,9 +106,11 @@ function stateFor(
   scope: VaultScope,
   vault: VaultStore,
   authorization: UnmaskAuthorization,
+  maxStates: number,
 ): StreamState {
   const existing = states.get(field.key);
   if (existing !== undefined) return existing;
+  if (states.size >= maxStates) throw new GatewayError("HM-5001", "upstream provider error");
   const created: StreamState = {
     unmasker: new StreamingUnmasker(scope, vault, authorization),
     make: (value: string) => field.make(value),
@@ -106,4 +119,10 @@ function stateFor(
   };
   states.set(field.key, created);
   return created;
+}
+
+function enforceBufferLimit(value: string, maxBytes: number): void {
+  if (Buffer.byteLength(value, "utf8") > maxBytes) {
+    throw new GatewayError("HM-5001", "upstream provider error");
+  }
 }

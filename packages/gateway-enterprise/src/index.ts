@@ -3,6 +3,7 @@ export * from "./admin/rbac.js";
 export * from "./admin/routes.js";
 export * from "./admin/session.js";
 export * from "./audit/canonical.js";
+export * from "./audit/checkpoint.js";
 export * from "./audit/store.js";
 export * from "./audit/types.js";
 export * from "./audit/verify.js";

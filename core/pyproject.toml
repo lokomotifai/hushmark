@@ -1,6 +1,6 @@
 [project]
 name = "hushmark-core"
-version = "0.1.0"
+version = "0.1.1"
 description = "Turkish-first PII detection and masking engine"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"

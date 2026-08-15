@@ -1,6 +1,6 @@
 services:
   core:
-    image: hushmark/core:0.1.0-dev
+    image: hushmark/core:0.1.1-dev
     build:
       target: slim
     cpus: 4.0
@@ -9,6 +9,7 @@ services:
       - ../../models:/models:ro
     environment:
       HUSHMARK_CORE_LOG_LEVEL: debug
+      HUSHMARK_CORE_ALLOW_UNAUTHENTICATED: "true"
     ports:
       - "127.0.0.1:8000:8000"
 

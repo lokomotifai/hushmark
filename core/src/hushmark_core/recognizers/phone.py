@@ -5,9 +5,10 @@ from __future__ import annotations
 import re
 
 from hushmark_core.recognizers.base import DetectorHit, ValidatorRecognizer
+from hushmark_core.recognizers.digits import ascii_digit
 
 PHONE_PATTERN = re.compile(
-    r"(?<!\d)(?:(?:\+|00)90[ .()-]*|0)?(?:\d[ .()-]*){9}\d(?!\d)",
+    r"(?<!\d)\+?(?:\d[ .()-]*){9,13}\d(?!\d)",
 )
 MOBILE_PREFIXES = {f"5{second}{third}" for second in range(10) for third in range(10)}
 LANDLINE_PREFIXES = {
@@ -97,7 +98,7 @@ LANDLINE_PREFIXES = {
 
 
 def compact_phone(value: str) -> str:
-    return "".join(char for char in value if char.isascii() and char.isdigit())
+    return "".join(digit for char in value if (digit := ascii_digit(char)) is not None)
 
 
 def validate_tr_phone(value: str) -> bool:

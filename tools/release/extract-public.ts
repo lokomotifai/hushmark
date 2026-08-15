@@ -1,8 +1,11 @@
 import { chmod, copyFile, lstat, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { execFile } from "node:child_process";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { promisify } from "node:util";
 
-const VERSION = "0.1.0";
+const VERSION = "0.1.1";
+const execFileAsync = promisify(execFile);
 const SKIP_NAMES = new Set([
   ".DS_Store",
   ".mypy_cache",
@@ -105,7 +108,7 @@ async function copyEntry(
 }
 
 function publicWorkspace(): string {
-  return `packages:\n  - "packages/gateway"\n  - "packages/sdk-ts"\n  - "packages/shared"\n\nonlyBuiltDependencies:\n  - esbuild\n`;
+  return `packages:\n  - "packages/gateway"\n  - "packages/sdk-ts"\n  - "packages/shared"\n\nonlyBuiltDependencies:\n  - esbuild\n\noverrides:\n  "esbuild@<=0.24.2": 0.25.12\n  "esbuild@>=0.27.3 <0.28.1": 0.28.2\n`;
 }
 
 function publicBootstrap(): string {
@@ -185,19 +188,44 @@ permissions:
   contents: read
 
 jobs:
+  repository-safety:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - name: Install Gitleaks
+        run: |
+          curl -fsSLo gitleaks.tar.gz https://github.com/gitleaks/gitleaks/releases/download/v8.28.0/gitleaks_8.28.0_linux_x64.tar.gz
+          curl -fsSLo gitleaks.checksums https://github.com/gitleaks/gitleaks/releases/download/v8.28.0/gitleaks_8.28.0_checksums.txt
+          grep 'gitleaks_8.28.0_linux_x64.tar.gz' gitleaks.checksums \
+            | sed 's#gitleaks_8.28.0_linux_x64.tar.gz#gitleaks.tar.gz#' \
+            | sha256sum --check
+          tar -xzf gitleaks.tar.gz gitleaks
+          sudo install -m 0755 gitleaks /usr/local/bin/gitleaks
+      - name: Scan committed changes for secrets
+        env:
+          GITLEAKS_BASE: \${{ github.event.pull_request.base.sha || github.event.before }}
+          GITLEAKS_HEAD: \${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          if [[ "$GITLEAKS_BASE" =~ ^0+$ ]] || ! git cat-file -e "\${GITLEAKS_BASE}^{commit}" 2>/dev/null; then
+            gitleaks git --redact --no-banner --verbose --log-opts="$GITLEAKS_HEAD" .
+          else
+            gitleaks git --redact --no-banner --verbose --log-opts="\${GITLEAKS_BASE}..\${GITLEAKS_HEAD}" .
+          fi
+
   verify:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 9.15.9
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version-file: .nvmrc
           cache: pnpm
-      - uses: astral-sh/setup-uv@v6
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
         with:
           python-version: "3.12"
       - run: ./scripts/bootstrap.sh
@@ -205,43 +233,148 @@ jobs:
 `;
 }
 
+function publicSupplyChainWorkflow(): string {
+  return `name: supply-chain
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  packages:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
+        with:
+          python-version: "3.12"
+      - run: ./scripts/bootstrap.sh
+      - run: pnpm audit --audit-level high
+      - name: Audit locked Python dependencies
+        run: |
+          mkdir -p dist
+          uv export --all-packages --no-dev --frozen --no-emit-workspace --format requirements-txt --output-file dist/requirements.txt
+          uvx --from pip-audit==2.9.0 pip-audit --progress-spinner=off --no-deps --disable-pip --requirement dist/requirements.txt
+      - name: Build and inspect release archives
+        run: |
+          mkdir -p dist/npm dist/python
+          pnpm --filter @hushmark/shared build
+          pnpm --filter @hushmark/ai-sdk build
+          pnpm --dir packages/shared pack --pack-destination "$GITHUB_WORKSPACE/dist/npm"
+          pnpm --dir packages/sdk-ts pack --pack-destination "$GITHUB_WORKSPACE/dist/npm"
+          uv build --package hushmark-core --out-dir dist/python/core
+          uv build --package hushmark-sdk --out-dir dist/python/sdk
+          for archive in dist/npm/*.tgz dist/python/*/*.tar.gz; do tar -tzf "$archive"; done
+          python - <<'PY'
+          import tarfile
+          from pathlib import Path, PurePosixPath
+          from zipfile import ZipFile
+
+          forbidden = {"research", "briefs", "hushmark", "PLAN.md", "PLAN-BRIEF.md", "EXECUTABLE-PLAN-PROMPT.md"}
+
+          def leaked_paths(names: list[str]) -> list[str]:
+              return [name for name in names if any(part in forbidden for part in PurePosixPath(name).parts)]
+
+          for tarball in [*Path("dist/npm").glob("*.tgz"), *Path("dist/python").glob("*/*.tar.gz")]:
+              with tarfile.open(tarball, "r:gz") as archive:
+                  leaked = leaked_paths(archive.getnames())
+                  if leaked:
+                      raise SystemExit(f"forbidden paths in {tarball}: {leaked}")
+          for wheel in Path("dist/python").glob("*/*.whl"):
+              with ZipFile(wheel) as archive:
+                  leaked = leaked_paths(archive.namelist())
+                  if leaked:
+                      raise SystemExit(f"forbidden paths in {wheel}: {leaked}")
+          PY
+      - name: Install Syft and Grype
+        run: |
+          curl -fsSLO https://github.com/anchore/syft/releases/download/v1.50.0/syft_1.50.0_linux_amd64.tar.gz
+          curl -fsSLO https://github.com/anchore/syft/releases/download/v1.50.0/syft_1.50.0_checksums.txt
+          grep 'syft_1.50.0_linux_amd64.tar.gz' syft_1.50.0_checksums.txt | sha256sum --check
+          tar -xzf syft_1.50.0_linux_amd64.tar.gz syft
+          sudo install -m 0755 syft /usr/local/bin/syft
+          curl -fsSLO https://github.com/anchore/grype/releases/download/v0.116.1/grype_0.116.1_linux_amd64.tar.gz
+          curl -fsSLO https://github.com/anchore/grype/releases/download/v0.116.1/grype_0.116.1_checksums.txt
+          grep 'grype_0.116.1_linux_amd64.tar.gz' grype_0.116.1_checksums.txt | sha256sum --check
+          tar -xzf grype_0.116.1_linux_amd64.tar.gz grype
+          sudo install -m 0755 grype /usr/local/bin/grype
+      - name: Generate SBOM and enforce fixed-critical budget
+        run: |
+          syft dir:. -o cyclonedx-json=open-core.cdx.json -o spdx-json=open-core.spdx.json
+          grype sbom:open-core.spdx.json --only-fixed --fail-on critical
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: open-core-release-evidence
+          path: |
+            dist
+            open-core.cdx.json
+            open-core.spdx.json
+`;
+}
+
 function publicReleaseWorkflow(): string {
   return `name: release
 
 on:
-  workflow_dispatch:
-    inputs:
-      target:
-        description: Package registry target
-        required: true
-        default: all
-        type: choice
-        options:
-          - all
-          - npm
-          - pypi
+  push:
+    tags: ["v[0-9]*.[0-9]*.[0-9]*"]
 
 permissions:
   contents: read
 
 concurrency:
-  group: release-\${{ inputs.target }}
+  group: release-\${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
-  npm:
-    if: \${{ inputs.target == 'all' || inputs.target == 'npm' }}
+  verify:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - name: Validate immutable release source
+        env:
+          RELEASE_TAG: \${{ github.ref_name }}
+        run: |
+          test "$RELEASE_TAG" = "v${VERSION}"
+          git fetch --no-tags origin main
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
+        with:
+          python-version: "3.12"
+      - run: ./scripts/bootstrap.sh
+      - run: ./scripts/verify.sh
+
+  npm:
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
     environment: npm
     permissions:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 9.15.9
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version-file: .nvmrc
           cache: pnpm
@@ -254,44 +387,46 @@ jobs:
           mkdir -p dist/npm
           pnpm --dir packages/shared pack --pack-destination "$GITHUB_WORKSPACE/dist/npm"
           pnpm --dir packages/sdk-ts pack --pack-destination "$GITHUB_WORKSPACE/dist/npm"
-          tar -tzf dist/npm/hushmark-shared-0.1.0.tgz
-          tar -tzf dist/npm/hushmark-ai-sdk-0.1.0.tgz
+          tar -tzf dist/npm/hushmark-shared-${VERSION}.tgz
+          tar -tzf dist/npm/hushmark-ai-sdk-${VERSION}.tgz
       - name: Publish with npm trusted publishing
         run: |
-          npm publish dist/npm/hushmark-shared-0.1.0.tgz --access public --provenance
-          npm publish dist/npm/hushmark-ai-sdk-0.1.0.tgz --access public --provenance
+          npm publish dist/npm/hushmark-shared-${VERSION}.tgz --access public --provenance
+          npm publish dist/npm/hushmark-ai-sdk-${VERSION}.tgz --access public --provenance
 
   pypi-core:
-    if: \${{ inputs.target == 'all' || inputs.target == 'pypi' }}
+    needs: verify
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     environment: pypi-core
     permissions:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
         with:
           python-version: "3.12"
       - run: uv build --package hushmark-core --out-dir dist/core
-      - uses: pypa/gh-action-pypi-publish@release/v1
+      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # release/v1
         with:
           packages-dir: dist/core
 
   pypi-sdk:
-    if: \${{ inputs.target == 'all' || inputs.target == 'pypi' }}
+    needs: verify
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     environment: pypi-sdk
     permissions:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
         with:
           python-version: "3.12"
       - run: uv build --package hushmark-sdk --out-dir dist/sdk
-      - uses: pypa/gh-action-pypi-publish@release/v1
+      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # release/v1
         with:
           packages-dir: dist/sdk
 `;
@@ -312,7 +447,20 @@ async function writeGeneratedFiles(repoRoot: string, output: string): Promise<vo
   await writeFile(join(output, "scripts/verify.sh"), publicVerify(), { mode: 0o755 });
   await mkdir(join(output, ".github/workflows"), { recursive: true });
   await writeFile(join(output, ".github/workflows/ci.yml"), publicCiWorkflow());
+  await writeFile(join(output, ".github/workflows/supply-chain.yml"), publicSupplyChainWorkflow());
   await writeFile(join(output, ".github/workflows/release.yml"), publicReleaseWorkflow());
+}
+
+async function regeneratePublicLockfile(repoRoot: string, output: string): Promise<void> {
+  const pnpmCli = join(repoRoot, "node_modules", "pnpm", "bin", "pnpm.cjs");
+  await execFileAsync(
+    process.execPath,
+    [pnpmCli, "install", "--lockfile-only", "--offline", "--ignore-scripts"],
+    {
+      cwd: output,
+      env: { ...process.env, CI: "true" },
+    },
+  );
 }
 
 async function listFiles(root: string, path = root): Promise<string[]> {
@@ -351,6 +499,7 @@ export async function extractPublicTree(options: ExtractOptions): Promise<void> 
   const publicRoot = join(repoRoot, "tools/release/public-root");
   for (const entry of await readdir(publicRoot)) await copyEntry(publicRoot, output, entry);
   await writeGeneratedFiles(repoRoot, output);
+  await regeneratePublicLockfile(repoRoot, output);
   await assertNoLeak(output);
   console.log(`public mirror extracted to ${output}`);
 }

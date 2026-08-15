@@ -5,14 +5,14 @@ spec:
   replicas: 1
   selector: { matchLabels: { app: fake-upstream } }
   template:
-    metadata: { labels: { app: fake-upstream } }
+    metadata: { labels: { app: fake-upstream, hushmark.ai/gateway-upstream: "true" } }
     spec:
       automountServiceAccountToken: false
       enableServiceLinks: false
       securityContext: { runAsNonRoot: true, runAsUser: 10001, runAsGroup: 10001 }
       containers:
         - name: fake-upstream
-          image: hushmark/gateway:0.1.0
+          image: hushmark/gateway:0.1.1
           imagePullPolicy: Never
           command: ["node", "eval/fake-upstream.mjs"]
           env: [{ name: PORT, value: "9000" }]

@@ -127,6 +127,31 @@ export const vaultRecords = pgTable(
   ],
 );
 
+export const vaultSessionKeys = pgTable(
+  "vault_session_keys",
+  {
+    tenantId: text("tenant_id").notNull(),
+    sessionId: text("session_id").notNull(),
+    wrappedKey: text("wrapped_key").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.tenantId, table.sessionId] })],
+);
+
+export const vaultPlaceholderCounters = pgTable(
+  "vault_placeholder_counters",
+  {
+    tenantId: text("tenant_id").notNull(),
+    sessionId: text("session_id").notNull(),
+    label: text("label").notNull(),
+    suffix: text("suffix").notNull(),
+    nextValue: integer("next_value").notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.tenantId, table.sessionId, table.label, table.suffix] }),
+  ],
+);
+
 export const providers = pgTable("providers", {
   id: uuid("id").primaryKey(),
   name: text("name").notNull(),

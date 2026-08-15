@@ -11,6 +11,15 @@ const API_KEY = "hm_k1_1234567890abcdef";
 const SESSION_ID = "019121aa-7c3e-7bbb-9a10-3f6e2b4c9d21";
 
 describe("createHushmark", () => {
+  it("rejects credential-bearing HTTP outside loopback by default", () => {
+    expect(() =>
+      createHushmark({
+        baseUrl: "http://gateway.example.test",
+        apiKey: API_KEY,
+      }),
+    ).toThrow(/must use HTTPS/u);
+  });
+
   it("derives provider URLs and injects only gateway credentials", async () => {
     const baseFetch = vi.fn<typeof fetch>().mockResolvedValue(new Response("{}"));
     const client = createHushmark({

@@ -9,6 +9,15 @@ from hushmark_sdk import Hushmark, HushmarkError
 API_KEY = "hm_k1_1234567890abcdef"
 
 
+def test_non_loopback_http_requires_explicit_development_opt_in() -> None:
+    with pytest.raises(ValueError, match="must use HTTPS"):
+        Hushmark(
+            core_url="https://core.example.test",
+            gateway_url="http://gateway.example.test",
+            api_key=API_KEY,
+        )
+
+
 def test_mask_analyze_and_chat_route_to_the_expected_service() -> None:
     seen: list[httpx.Request] = []
 
@@ -41,6 +50,7 @@ def test_mask_analyze_and_chat_route_to_the_expected_service() -> None:
         core_url="http://core.local/",
         gateway_url="http://gateway.local/",
         api_key=API_KEY,
+        allow_insecure_http=True,
         transport=httpx.MockTransport(handler),
     ) as client:
         client.analyze([{"id": "m0", "text": "hello"}])
@@ -66,6 +76,7 @@ def test_structured_failures_are_typed() -> None:
         core_url="http://core.local",
         gateway_url="http://gateway.local",
         api_key=API_KEY,
+        allow_insecure_http=True,
         transport=httpx.MockTransport(handler),
     )
     with pytest.raises(HushmarkError) as caught:
@@ -84,6 +95,7 @@ def test_invalid_core_payload_fails_closed() -> None:
         core_url="http://core.local",
         gateway_url="http://gateway.local",
         api_key=API_KEY,
+        allow_insecure_http=True,
         transport=httpx.MockTransport(handler),
     )
     with pytest.raises(HushmarkError, match="invalid response"):
@@ -103,6 +115,7 @@ def test_chat_accepts_anthropic_payloads() -> None:
         core_url="http://core.local",
         gateway_url="http://gateway.local",
         api_key=API_KEY,
+        allow_insecure_http=True,
         transport=httpx.MockTransport(handler),
     ) as client:
         client.chat(

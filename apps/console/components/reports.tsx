@@ -4,6 +4,7 @@ import { useTranslations } from "next-intl";
 import { useState } from "react";
 
 import { PageHead } from "@/components/page-head";
+import { adminDownload } from "@/lib/admin";
 
 function initialPeriod(): { from: string; to: string } {
   const now = new Date();
@@ -17,7 +18,20 @@ function initialPeriod(): { from: string; to: string } {
 export function Reports() {
   const t = useTranslations("Reports");
   const [period, setPeriod] = useState(initialPeriod);
-  const href = `/api/admin/reports/tedbir?from=${encodeURIComponent(period.from)}&to=${encodeURIComponent(period.to)}&format=pdf`;
+  const [pending, setPending] = useState(false);
+
+  async function generate() {
+    setPending(true);
+    try {
+      const query = `from=${encodeURIComponent(period.from)}&to=${encodeURIComponent(period.to)}&format=pdf`;
+      await adminDownload(
+        `reports/tedbir?${query}`,
+        `hushmark-tedbir-${period.from}-${period.to}.pdf`,
+      );
+    } finally {
+      setPending(false);
+    }
+  }
   return (
     <>
       <PageHead eyebrow={t("eyebrow")} subtitle={t("subtitle")} title={t("title")} />
@@ -45,9 +59,14 @@ export function Reports() {
           </label>
         </div>
         <div className="form-actions">
-          <a className="button" download href={href}>
+          <button
+            className="button"
+            disabled={pending}
+            type="button"
+            onClick={() => void generate()}
+          >
             {t("generate")}
-          </a>
+          </button>
         </div>
       </section>
       <section className="card">

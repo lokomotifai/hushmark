@@ -8,20 +8,34 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from hushmark_core.taxonomy_gen import ENTITY_TYPES
 
+MAX_ITEMS_PER_REQUEST = 128
+MAX_ITEM_ID_LENGTH = 128
+MAX_TEXT_CODE_POINTS = 65_536
+MAX_TOTAL_TEXT_CODE_POINTS = 262_144
+MAX_SESSION_LENGTH = 128
+
 
 class StrictModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
 class TextItem(StrictModel):
-    id: str = Field(min_length=1)
-    text: str
+    id: str = Field(min_length=1, max_length=MAX_ITEM_ID_LENGTH)
+    text: str = Field(max_length=MAX_TEXT_CODE_POINTS)
 
 
 class AnalyzeRequest(StrictModel):
-    items: list[TextItem] = Field(min_length=1)
+    items: list[TextItem] = Field(min_length=1, max_length=MAX_ITEMS_PER_REQUEST)
     language: Literal["tr", "en"] = "tr"
-    session: str | None = None
+    session: str | None = Field(default=None, min_length=1, max_length=MAX_SESSION_LENGTH)
+
+    @model_validator(mode="after")
+    def validate_request_budget(self) -> AnalyzeRequest:
+        if sum(len(item.text) for item in self.items) > MAX_TOTAL_TEXT_CODE_POINTS:
+            raise ValueError("request text budget exceeded")
+        if len({item.id for item in self.items}) != len(self.items):
+            raise ValueError("item identifiers must be unique")
+        return self
 
 
 class MaskRequest(AnalyzeRequest):

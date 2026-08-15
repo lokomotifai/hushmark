@@ -22,7 +22,7 @@ it("rate-limits repeated admin login attempts and records a pseudonymous actor",
   const { runtime } = await enterpriseHarness();
   close = () => runtime.app.close();
   const responses = [];
-  for (let attempt = 0; attempt < 6; attempt += 1) {
+  for (let attempt = 0; attempt < 11; attempt += 1) {
     responses.push(
       await runtime.app.inject({
         method: "POST",
@@ -32,9 +32,9 @@ it("rate-limits repeated admin login attempts and records a pseudonymous actor",
       }),
     );
   }
-  expect(responses.slice(0, 5).every((response) => response.statusCode === 401)).toBe(true);
-  expect(responses[5]?.statusCode).toBe(429);
-  expect(responses[5]?.json()).toMatchObject({ error: { code: "HM-4290" } });
+  expect(responses.slice(0, 10).every((response) => response.statusCode === 401)).toBe(true);
+  expect(responses[10]?.statusCode).toBe(429);
+  expect(responses[10]?.json()).toMatchObject({ error: { code: "HM-4290" } });
   const events = await runtime.auditStore.list();
   expect(events.at(-1)?.actor).toMatch(/^anonymous:[0-9a-f]{16}$/u);
 });

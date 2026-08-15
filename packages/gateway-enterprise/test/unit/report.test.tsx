@@ -2,6 +2,7 @@ import { PDFParse } from "pdf-parse";
 import { expect, it } from "vitest";
 
 import { sha256 } from "../../src/audit/canonical.js";
+import { MemoryAuditCheckpointStore } from "../../src/audit/checkpoint.js";
 import { MemoryAuditStore } from "../../src/audit/store.js";
 import { AuditWriter } from "../../src/audit/writer.js";
 import { buildTedbirReportData, renderTedbirPdf } from "../../src/reports/tedbir.js";
@@ -9,7 +10,12 @@ import { buildTedbirReportData, renderTedbirPdf } from "../../src/reports/tedbir
 it("renders the required Turkish Madde 12 sections and period totals", async () => {
   const clock = { now: () => new Date("2026-08-09T12:30:00.000Z") };
   const store = new MemoryAuditStore();
-  const writer = new AuditWriter(store, clock);
+  const writer = new AuditWriter(
+    store,
+    new Uint8Array(32).fill(9),
+    new MemoryAuditCheckpointStore(),
+    clock,
+  );
   await writer.append({
     kind: "MASK_APPLIED",
     actor: "system:gateway",
@@ -27,11 +33,12 @@ it("renders the required Turkish Madde 12 sections and period totals", async () 
     request_sha256: sha256("policy"),
     entities: [],
   });
-  const data = buildTedbirReportData(
+  const data = await buildTedbirReportData(
     await store.list(),
     "2026-08-01",
     "2026-08-31",
     "2026-08-09T12:30:00.000Z",
+    (records, from, to) => writer.verify(records, from, to),
   );
   expect(data.totals).toMatchObject({ events: 2, masked: 3, policyChanges: 1 });
   expect(data.chain).toMatchObject({ ok: true, verified: 2 });

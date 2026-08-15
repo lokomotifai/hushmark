@@ -1,7 +1,14 @@
 import { afterEach, expect, it } from "vitest";
 
 import { verifyAuditChain } from "../../src/audit/verify.js";
-import { API_KEY, CANARY_NAME, CANARY_TCKN, DEMO_TEXT, enterpriseHarness } from "../helpers.js";
+import {
+  API_KEY,
+  AUDIT_INTEGRITY_KEY,
+  CANARY_NAME,
+  CANARY_TCKN,
+  DEMO_TEXT,
+  enterpriseHarness,
+} from "../helpers.js";
 
 let close: (() => Promise<void>) | undefined;
 afterEach(async () => close?.());
@@ -21,7 +28,7 @@ it("INV-07 keeps raw values out of the audit chain after enterprise traffic", as
   expect(upstream.body).not.toContain(CANARY_NAME);
   expect(response.body).toContain(CANARY_NAME);
   const events = await runtime.auditStore.list();
-  expect(verifyAuditChain(events).ok).toBe(true);
+  expect(verifyAuditChain(events, 1, "latest", AUDIT_INTEGRITY_KEY).ok).toBe(true);
   expect(JSON.stringify(events)).not.toContain(CANARY_NAME);
   expect(JSON.stringify(events)).not.toContain(CANARY_TCKN);
   expect(events.some((event) => event.kind === "MASK_APPLIED")).toBe(true);

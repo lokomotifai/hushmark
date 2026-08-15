@@ -56,7 +56,7 @@ fi
 if [[ -z "$cluster_name" ]]; then
   [[ "$evaluation" == false ]] || { echo "--evaluation requires --kind-cluster" >&2; exit 2; }
   [[ "$load_only" == true ]] || { usage; exit 2; }
-  echo "Verified and loaded Hushmark 0.1.0 images."
+  echo "Verified and loaded Hushmark 0.1.1 images."
   exit 0
 fi
 
@@ -67,22 +67,24 @@ kind get clusters | grep -Fxq "$cluster_name" || { echo "kind cluster not found:
 kind load image-archive --name "$cluster_name" "$images_archive"
 
 if [[ "$evaluation" == false ]]; then
-  echo "Verified and loaded Hushmark 0.1.0 images into kind cluster $cluster_name."
+  echo "Verified and loaded Hushmark 0.1.1 images into kind cluster $cluster_name."
   exit 0
 fi
 
 kubectl create namespace "$namespace" --dry-run=client -o yaml | kubectl apply -f -
+kubectl label namespace "$namespace" hushmark.ai/gateway-access=true --overwrite
 kubectl -n "$namespace" create secret generic hushmark-gateway \
   --from-literal=api-keys=hm_k1_evaluation_local_key \
   --from-literal=openai-api-key=evaluation \
   --from-literal=anthropic-api-key=evaluation \
+  --from-literal=core-service-token="$(openssl rand -hex 32)" \
   --dry-run=client -o yaml | kubectl apply -f -
 kubectl -n "$namespace" apply -f "$bundle_dir/manifests/eval-services.yaml"
 
-helm upgrade --install hushmark "$bundle_dir/chart/hushmark-0.1.0.tgz" \
+helm upgrade --install hushmark "$bundle_dir/chart/hushmark-0.1.1.tgz" \
   --namespace "$namespace" \
   --set fullnameOverride=hushmark \
-  --set core.image.tag=0.1.0-model \
+  --set core.image.tag=0.1.1-model \
   --set core.image.pullPolicy=Never \
   --set core.nerBackend=onnx \
   --set gateway.image.pullPolicy=Never \

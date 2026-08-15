@@ -10,6 +10,7 @@ from typing import Protocol, cast
 
 from hushmark_core.ner.base import NerSpan
 from hushmark_core.ner.decode import decode_predictions
+from hushmark_core.ner.integrity import verify_runtime_artifacts
 from hushmark_core.ner.registry_types import ModelSpecLike
 
 
@@ -54,6 +55,7 @@ class TorchNerBackend:
             measured_sha256 = file_digest(model_stream, "sha256").hexdigest()
         if measured_sha256 != self._spec.sha256:
             raise ValueError(f"PyTorch model SHA-256 verification failed: {model_file}")
+        verify_runtime_artifacts(self._model_dir, self._spec)
         self._measured_sha256 = measured_sha256
         gliner_module = importlib.import_module("gliner")
         gliner_class = gliner_module.GLiNER

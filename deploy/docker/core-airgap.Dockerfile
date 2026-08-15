@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.12
 
-ARG BASE_IMAGE=hushmark/core:0.1.0
+ARG BASE_IMAGE=hushmark/core:0.1.1
 FROM ${BASE_IMAGE}
 
 COPY --chown=10001:10001 \

@@ -12,7 +12,7 @@ export interface AuditStore {
   }>;
   latest(): Promise<AuditRecord | null>;
   append(record: AuditRecord): Promise<void>;
-  appendLinked?(input: AuditInput, integrityKey?: string | Uint8Array): Promise<AuditRecord>;
+  appendLinked?(input: AuditInput, integrityKey: string | Uint8Array): Promise<AuditRecord>;
 }
 
 export class MemoryAuditStore implements AuditStore {
@@ -159,7 +159,7 @@ export class SqlAuditStore implements AuditStore {
     );
   }
 
-  async appendLinked(input: AuditInput, integrityKey?: string | Uint8Array): Promise<AuditRecord> {
+  async appendLinked(input: AuditInput, integrityKey: string | Uint8Array): Promise<AuditRecord> {
     if (this.sql.transaction === undefined) {
       throw new Error("SQL audit store requires transactional executor support");
     }

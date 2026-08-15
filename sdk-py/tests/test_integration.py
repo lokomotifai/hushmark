@@ -38,6 +38,7 @@ def test_python_sdk_and_batch_example_against_real_local_stack() -> None:
         "TRANSFORMERS_OFFLINE": "1",
         "HUSHMARK_CORE_NER_BACKEND": "onnx",
         "HUSHMARK_CORE_LOG_LEVEL": "error",
+        "HUSHMARK_CORE_ALLOW_UNAUTHENTICATED": "true",
         "UV_CACHE_DIR": "/tmp/hushmark-uv-cache",
     }
     with _process(

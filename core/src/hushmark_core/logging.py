@@ -14,6 +14,13 @@ class CoreLogEvent(TypedDict, total=False):
     method: str
     status: int
     duration_ms: float
+    outcome: Literal[
+        "ok",
+        "error",
+        "auth_failed",
+        "body_too_large",
+        "capacity_exceeded",
+    ]
 
 
 def configure_logging(level: str) -> None:

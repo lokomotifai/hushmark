@@ -43,6 +43,7 @@ it("round-trips through AI SDK v7 middleware, the gateway, and the real core", a
         TRANSFORMERS_OFFLINE: "1",
         HUSHMARK_CORE_NER_BACKEND: "onnx",
         HUSHMARK_CORE_LOG_LEVEL: "error",
+        HUSHMARK_CORE_ALLOW_UNAUTHENTICATED: "true",
         UV_CACHE_DIR: "/tmp/hushmark-uv-cache",
       },
       stdio: "ignore",
@@ -151,7 +152,11 @@ function gatewayConfig(corePort: number, gatewayPort: number): GatewayConfig {
     HUSHMARK_RATE_LIMIT_MAX: 120,
     HUSHMARK_RATE_LIMIT_WINDOW_SEC: 60,
     HUSHMARK_BODY_LIMIT_BYTES: 1_048_576,
-    HUSHMARK_TRUST_PROXY: false,
+    HUSHMARK_UPSTREAM_MAX_RESPONSE_BYTES: 8_388_608,
+    HUSHMARK_UPSTREAM_BODY_TIMEOUT_MS: 60_000,
+    HUSHMARK_STREAM_MAX_BUFFER_BYTES: 1_048_576,
+    HUSHMARK_STREAM_MAX_STATES: 128,
+    HUSHMARK_TRUST_PROXY_HOPS: 0,
   };
 }
 

@@ -105,7 +105,11 @@ it(
     const versions = await database.query<{ version: string }>(
       "SELECT version FROM hushmark_schema_migrations ORDER BY version",
     );
-    expect(versions.rows.map((row) => row.version)).toEqual(["0001_security_hardening"]);
+    expect(versions.rows.map((row) => row.version)).toEqual([
+      "0001_security_hardening",
+      "0002_vault_session_keys",
+      "0003_vault_placeholder_counters",
+    ]);
   },
   DATABASE_TEST_TIMEOUT_MS,
 );

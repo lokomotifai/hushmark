@@ -48,9 +48,9 @@ async function proxy(request: NextRequest, context: RouteContext): Promise<NextR
   gateway.pathname = `/admin/${path.map(encodeURIComponent).join("/")}`;
   gateway.search = request.nextUrl.search;
   const headers = new Headers();
-  const cookie = request.headers.get("cookie");
+  const adminCookie = request.cookies.get("hm_admin")?.value;
   const contentType = request.headers.get("content-type");
-  if (cookie !== null) headers.set("cookie", cookie);
+  if (adminCookie !== undefined) headers.set("cookie", `hm_admin=${adminCookie}`);
   if (contentType !== null) headers.set("content-type", contentType);
   const hasBody = request.method !== "GET" && request.method !== "HEAD";
   const upstream = await fetch(gateway, {
@@ -66,8 +66,9 @@ async function proxy(request: NextRequest, context: RouteContext): Promise<NextR
       responseHeaders.set(key, value);
     }
   });
-  for (const cookie of upstream.headers.getSetCookie())
-    responseHeaders.append("set-cookie", cookie);
+  for (const cookie of upstream.headers.getSetCookie()) {
+    if (cookie.startsWith("hm_admin=")) responseHeaders.append("set-cookie", cookie);
+  }
   return new NextResponse(await upstream.arrayBuffer(), {
     status: upstream.status,
     headers: responseHeaders,
@@ -75,13 +76,9 @@ async function proxy(request: NextRequest, context: RouteContext): Promise<NextR
 }
 
 function requestOrigin(request: NextRequest): string | null {
-  const forwardedHost = request.headers.get("x-forwarded-host")?.split(",", 1)[0]?.trim();
-  const host = forwardedHost ?? request.headers.get("host");
-  const forwardedProtocol = request.headers.get("x-forwarded-proto")?.split(",", 1)[0]?.trim();
-  const protocol = forwardedProtocol ?? request.nextUrl.protocol.slice(0, -1);
-  if (host === null || (protocol !== "http" && protocol !== "https")) return null;
+  const configured = process.env.HUSHMARK_CONSOLE_ORIGIN;
   try {
-    return new URL(`${protocol}://${host}`).origin;
+    return configured === undefined ? request.nextUrl.origin : new URL(configured).origin;
   } catch {
     return null;
   }

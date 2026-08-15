@@ -23,6 +23,7 @@ export default defineConfig({
     timeout: 60_000,
     env: {
       HUSHMARK_GATEWAY_URL: "http://127.0.0.1:31881",
+      HUSHMARK_CONSOLE_ORIGIN: "http://127.0.0.1:3100",
     },
   },
 });

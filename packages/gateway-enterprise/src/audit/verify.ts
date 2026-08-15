@@ -1,5 +1,6 @@
 import { auditHash, GENESIS_HASH } from "./canonical.js";
 import { AuditRecordSchema, type AuditRecord } from "./types.js";
+import type { AuditCheckpoint } from "./checkpoint.js";
 
 export interface VerifyResult {
   ok: boolean;
@@ -12,7 +13,8 @@ export function verifyAuditChain(
   input: readonly AuditRecord[],
   from = 1,
   to: number | "latest" = "latest",
-  integrityKey?: string | Uint8Array,
+  integrityKey: string | Uint8Array,
+  checkpoint?: AuditCheckpoint | null,
 ): VerifyResult {
   const records = input.map((record) => AuditRecordSchema.parse(record));
   const upper = to === "latest" ? Number.POSITIVE_INFINITY : to;
@@ -48,7 +50,22 @@ export function verifyAuditChain(
     if (record.seq >= from && record.seq <= upper) verified += 1;
     previousHash = record.hash;
     expectedSeq += 1;
-    if (record.seq >= upper) break;
+  }
+  const latest = records.at(-1);
+  if (checkpoint !== undefined && checkpoint !== null) {
+    const anchored = records[checkpoint.seq - 1];
+    if (anchored?.hash !== checkpoint.hash || latest?.seq !== checkpoint.seq) {
+      const firstBrokenSeq =
+        latest === undefined || latest.seq < checkpoint.seq
+          ? (latest?.seq ?? 0) + 1
+          : checkpoint.seq + 1;
+      return {
+        ok: false,
+        firstBrokenSeq,
+        verified,
+        outOfRange: firstBrokenSeq < from || firstBrokenSeq > upper,
+      };
+    }
   }
   return { ok: true, firstBrokenSeq: null, verified, outOfRange: false };
 }

@@ -3,6 +3,7 @@ import { generateKeyPairSync } from "node:crypto";
 import { expect, it } from "vitest";
 
 import { MemoryAuditStore } from "../../src/audit/store.js";
+import { MemoryAuditCheckpointStore } from "../../src/audit/checkpoint.js";
 import { AuditWriter } from "../../src/audit/writer.js";
 import { LicenseGuard } from "../../src/license/enforce.js";
 import type { UnsignedLicense } from "../../src/license/schema.js";
@@ -28,7 +29,11 @@ it("verifies ed25519 offline and emits valid, expiring, grace, frozen transition
 
   const clock = new TestClock(new Date("2026-08-09T00:00:00.000Z"));
   const store = new MemoryAuditStore();
-  const guard = new LicenseGuard(publicPem, clock, new AuditWriter(store, clock));
+  const guard = new LicenseGuard(
+    publicPem,
+    clock,
+    new AuditWriter(store, new Uint8Array(32).fill(9), new MemoryAuditCheckpointStore(), clock),
+  );
   expect(await guard.load(signed)).toBe(true);
   expect(await guard.status()).toBe("valid");
   clock.set("2026-12-15T00:00:00.000Z");

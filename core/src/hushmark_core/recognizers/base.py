@@ -37,7 +37,7 @@ class ValidatorRecognizer(EntityRecognizer):
             supported_entities=supported_entities,
             name=f"{name}-{language}",
             supported_language=language,
-            version="0.1.0",
+            version="0.1.1",
             country_code="TR",
         )
         self._detector = detector
