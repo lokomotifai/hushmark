@@ -1,5 +1,11 @@
 import type { FastifyInstance } from "fastify";
-import { buildServer, type ServerDependencies, type StaticPolicy } from "@hushmark/gateway";
+import fastifyRateLimit from "@fastify/rate-limit";
+import {
+  buildServer,
+  GatewayError,
+  type ServerDependencies,
+  type StaticPolicy,
+} from "@hushmark/gateway";
 
 import { registerAdminRoutes } from "./admin/routes.js";
 import type { AdminSessionStore } from "./admin/session.js";
@@ -38,6 +44,7 @@ export interface EnterpriseServerDependencies {
   auditCheckpointStore: AuditCheckpointStore;
   allowAuditCheckpointBootstrap?: boolean;
   adminSecureCookies?: boolean;
+  adminRateLimitMax?: number;
 }
 
 export interface EnterpriseRuntime {
@@ -98,6 +105,11 @@ export async function buildEnterpriseServer(
     vault,
     onMaskEvent: (event) => audit.appendMaskEvent(event).then(() => undefined),
   });
+  await app.register(fastifyRateLimit, {
+    global: false,
+    keyGenerator: (request) => request.ip,
+    errorResponseBuilder: () => new GatewayError("HM-4290", "admin request rate limit exceeded"),
+  });
   registerAdminRoutes(app, {
     identity: dependencies.identity,
     policies,
@@ -112,6 +124,9 @@ export async function buildEnterpriseServer(
     ...(dependencies.adminSecureCookies === undefined
       ? {}
       : { secureCookies: dependencies.adminSecureCookies }),
+    ...(dependencies.adminRateLimitMax === undefined
+      ? {}
+      : { requestRateLimitMax: dependencies.adminRateLimitMax }),
   });
   const stopSweeper = startVaultSweeper(vault);
   app.addHook("onClose", () => stopSweeper());

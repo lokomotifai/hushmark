@@ -1,6 +1,6 @@
 import { afterEach, expect, it } from "vitest";
 
-import { ADMIN_PASSWORD, enterpriseHarness } from "../helpers.js";
+import { ADMIN_PASSWORD, enterpriseHarness, login } from "../helpers.js";
 
 let close: (() => Promise<void>) | undefined;
 afterEach(async () => close?.());
@@ -37,4 +37,27 @@ it("rate-limits repeated admin login attempts and records a pseudonymous actor",
   expect(responses[10]?.json()).toMatchObject({ error: { code: "HM-4290" } });
   const events = await runtime.auditStore.list();
   expect(events.at(-1)?.actor).toMatch(/^anonymous:[0-9a-f]{16}$/u);
+});
+
+it("rate-limits authenticated admin requests by trusted client IP", async () => {
+  const { runtime } = await enterpriseHarness({ adminRateLimitMax: 2 });
+  close = () => runtime.app.close();
+  const cookie = await login(runtime, "admin@example.test");
+  const responses = [];
+  for (let request = 0; request < 3; request += 1) {
+    responses.push(
+      await runtime.app.inject({
+        method: "GET",
+        url: "/admin/metrics/summary",
+        headers: { cookie },
+      }),
+    );
+  }
+  expect(
+    responses.map((response) => response.statusCode).sort(),
+    responses.map((response) => response.body).join("\n"),
+  ).toEqual([200, 200, 429]);
+  expect(responses.find((response) => response.statusCode === 429)?.json()).toMatchObject({
+    error: { code: "HM-4290" },
+  });
 });

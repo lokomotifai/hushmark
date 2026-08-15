@@ -71,6 +71,7 @@ export interface AdminRouteDependencies {
   sessions?: AdminSessionStore;
   now?: () => Date;
   rateLimiter?: RateLimiter;
+  requestRateLimitMax?: number;
   secureCookies?: boolean;
 }
 
@@ -107,13 +108,21 @@ export function registerAdminRoutes(
     return principal;
   };
   const adminRoute = {
-    config: { hushmarkAuth: "admin" as const },
+    config: {
+      hushmarkAuth: "admin" as const,
+      rateLimit: { max: dependencies.requestRateLimitMax ?? 300, timeWindow: 60_000 },
+    },
     preHandler: authenticate,
   };
 
   app.post(
     "/admin/auth/login",
-    { config: { hushmarkAuth: "public" as const } },
+    {
+      config: {
+        hushmarkAuth: "public" as const,
+        rateLimit: { max: 30, timeWindow: 60_000 },
+      },
+    },
     async (request, reply) => {
       const input = LoginSchema.parse(request.body);
       const normalizedEmail = input.email.normalize("NFC").toLowerCase();

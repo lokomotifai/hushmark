@@ -47,7 +47,9 @@ export interface EnterpriseHarness {
   clock: TestClock;
 }
 
-export async function enterpriseHarness(): Promise<EnterpriseHarness> {
+export async function enterpriseHarness(
+  options: { adminRateLimitMax?: number } = {},
+): Promise<EnterpriseHarness> {
   const clock = new TestClock();
   const identity = new MemoryIdentityRepository();
   const passwordHash = await hashSecret(ADMIN_PASSWORD);
@@ -118,6 +120,9 @@ export async function enterpriseHarness(): Promise<EnterpriseHarness> {
     publicKeyPem: publicKey.export({ type: "spki", format: "pem" }).toString(),
     clock,
     nowMs: () => clock.now().getTime(),
+    ...(options.adminRateLimitMax === undefined
+      ? {}
+      : { adminRateLimitMax: options.adminRateLimitMax }),
   });
   return { runtime, identity, upstream, clock };
 }

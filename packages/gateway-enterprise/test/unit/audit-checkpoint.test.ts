@@ -1,4 +1,4 @@
-import { chmod, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { mkdtemp, open, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -24,10 +24,13 @@ it("persists an authenticated append-only checkpoint with owner-only permissions
   expect(await store.read()).toBeNull();
   await store.advance(checkpoint);
   expect(await store.read()).toEqual(checkpoint);
-  expect((await stat(path)).mode & 0o777).toBe(0o600);
-
-  const content = await readFile(path, "utf8");
-  await chmod(path, 0o600);
-  await writeFile(path, content.replace(/"mac":"[a-f0-9]+"/u, `"mac":"${"0".repeat(64)}"`));
+  const file = await open(path, "r+");
+  const content = await file.readFile("utf8");
+  expect((await file.stat()).mode & 0o777).toBe(0o600);
+  const tampered = content.replace(/"mac":"[a-f0-9]+"/u, `"mac":"${"0".repeat(64)}"`);
+  await file.truncate(0);
+  await file.write(tampered, 0, "utf8");
+  await file.sync();
+  await file.close();
   await expect(store.read()).rejects.toThrow("audit checkpoint authentication failed");
 });
