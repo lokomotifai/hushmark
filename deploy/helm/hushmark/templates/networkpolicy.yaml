@@ -2,7 +2,17 @@
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: {{ include "hushmark.fullname" . }}-core-ingress
+  name: {{ include "hushmark.fullname" . }}-default-deny
+  labels:
+    {{- include "hushmark.labels" . | nindent 4 }}
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "hushmark.fullname" . }}-core
   labels:
     {{- include "hushmark.labels" . | nindent 4 }}
 spec:
@@ -10,7 +20,7 @@ spec:
     matchLabels:
       {{- include "hushmark.selectorLabels" . | nindent 6 }}
       app.kubernetes.io/component: core
-  policyTypes: [Ingress]
+  policyTypes: [Ingress, Egress]
   ingress:
     - from:
         - podSelector:
@@ -19,13 +29,12 @@ spec:
               app.kubernetes.io/component: gateway
       ports:
         - { protocol: TCP, port: {{ .Values.core.service.port }} }
-{{- end }}
+  egress: []
 ---
-{{- if .Values.networkPolicy.enabled }}
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: {{ include "hushmark.fullname" . }}-gateway-ingress
+  name: {{ include "hushmark.fullname" . }}-gateway
   labels:
     {{- include "hushmark.labels" . | nindent 4 }}
 spec:
@@ -33,7 +42,7 @@ spec:
     matchLabels:
       {{- include "hushmark.selectorLabels" . | nindent 6 }}
       app.kubernetes.io/component: gateway
-  policyTypes: [Ingress]
+  policyTypes: [Ingress, Egress]
   ingress:
     - from:
         - podSelector:
@@ -45,4 +54,134 @@ spec:
               hushmark.ai/gateway-access: "true"
       ports:
         - { protocol: TCP, port: {{ .Values.gateway.service.port }} }
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - { protocol: UDP, port: 53 }
+        - { protocol: TCP, port: 53 }
+    - to:
+        - podSelector:
+            matchLabels:
+              {{- include "hushmark.selectorLabels" . | nindent 14 }}
+              app.kubernetes.io/component: core
+      ports:
+        - { protocol: TCP, port: {{ .Values.core.service.port }} }
+    {{- if .Values.postgres.enabled }}
+    - to:
+        - podSelector:
+            matchLabels:
+              {{- include "hushmark.selectorLabels" . | nindent 14 }}
+              app.kubernetes.io/component: postgres
+      ports:
+        - { protocol: TCP, port: 5432 }
+    {{- end }}
+    - to:
+        - podSelector:
+            matchLabels:
+              hushmark.ai/gateway-upstream: "true"
+      ports:
+        {{- range .Values.networkPolicy.internalUpstreamPorts }}
+        - { protocol: TCP, port: {{ . }} }
+        {{- end }}
+    {{- range .Values.networkPolicy.externalEgressCidrs }}
+    - to:
+        - ipBlock: { cidr: {{ . | quote }} }
+      ports:
+        {{- range $.Values.networkPolicy.externalEgressPorts }}
+        - { protocol: TCP, port: {{ . }} }
+        {{- end }}
+    {{- end }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "hushmark.fullname" . }}-internal-upstream
+  labels:
+    {{- include "hushmark.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      hushmark.ai/gateway-upstream: "true"
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              {{- include "hushmark.selectorLabels" . | nindent 14 }}
+              app.kubernetes.io/component: gateway
+      ports:
+        {{- range .Values.networkPolicy.internalUpstreamPorts }}
+        - { protocol: TCP, port: {{ . }} }
+        {{- end }}
+  egress: []
+{{- if .Values.console.enabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "hushmark.fullname" . }}-console
+  labels:
+    {{- include "hushmark.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "hushmark.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: console
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              hushmark.ai/gateway-access: "true"
+      ports:
+        - { protocol: TCP, port: {{ .Values.console.service.port }} }
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - { protocol: UDP, port: 53 }
+        - { protocol: TCP, port: 53 }
+    - to:
+        - podSelector:
+            matchLabels:
+              {{- include "hushmark.selectorLabels" . | nindent 14 }}
+              app.kubernetes.io/component: gateway
+      ports:
+        - { protocol: TCP, port: {{ .Values.gateway.service.port }} }
+{{- end }}
+{{- if .Values.postgres.enabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "hushmark.fullname" . }}-postgres
+  labels:
+    {{- include "hushmark.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "hushmark.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: postgres
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              {{- include "hushmark.selectorLabels" . | nindent 14 }}
+              app.kubernetes.io/component: gateway
+      ports:
+        - { protocol: TCP, port: 5432 }
+  egress: []
+{{- end }}
 {{- end }}

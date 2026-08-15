@@ -29,14 +29,14 @@ def test_training_bundle_is_reproducible_allowlisted_and_self_verifying(tmp_path
         names = archive.getnames()
         archive.extractall(tmp_path / "extracted", filter="data")
     assert names
-    assert all(name.startswith("hushmark-ac1-training-0.1.0/") for name in names)
+    assert all(name.startswith("hushmark-ac1-training-0.1.1/") for name in names)
     assert not any("/bench/train/outputs/" in name for name in names)
     assert not any("/bench/external/" in name for name in names)
     assert not any("/bench/external-data/" in name for name in names)
     assert not any("/models/" in name for name in names)
     assert not any(part in {"briefs", "research"} for name in names for part in Path(name).parts)
 
-    extracted = tmp_path / "extracted/hushmark-ac1-training-0.1.0"
+    extracted = tmp_path / "extracted/hushmark-ac1-training-0.1.1"
     result = subprocess.run(
         ["python3", "scripts/verify-training-bundle.py"],
         cwd=extracted,

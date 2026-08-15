@@ -4,7 +4,7 @@ set -euo pipefail
 repo_dir=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 cd "$repo_dir"
 
-version=0.1.0
+version=0.1.1
 bundle_name="hushmark-airgap-$version"
 artifact="$repo_dir/dist/$bundle_name.tar"
 stage_parent=$(mktemp -d)

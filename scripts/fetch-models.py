@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import shutil
 import sys
 import urllib.request
 from pathlib import Path
@@ -29,12 +30,14 @@ def validate_file(path: Path, spec: dict[str, Any]) -> bool:
     if not path.is_file() or path.stat().st_size != spec["size"]:
         return False
     expected = spec.get("sha256")
-    return expected is None or sha256_file(path) == expected
+    if not isinstance(expected, str) or len(expected) != 64:
+        raise ValueError(f"model file has no valid SHA-256 declaration: {path.name}")
+    return sha256_file(path) == expected
 
 
 def download_file(url: str, target: Path, spec: dict[str, Any]) -> None:
     partial = target.with_suffix(target.suffix + ".partial")
-    request = urllib.request.Request(url, headers={"User-Agent": "hushmark-bootstrap/0.1.0"})
+    request = urllib.request.Request(url, headers={"User-Agent": "hushmark-bootstrap/0.1.1"})
     with urllib.request.urlopen(request, timeout=600) as response, partial.open("wb") as output:
         while chunk := response.read(1024 * 1024):
             output.write(chunk)
@@ -76,13 +79,26 @@ def main() -> int:
             print(f"downloading {url}")
             download_file(url, target, file_spec)
             print(f"verified model file: {target.relative_to(ROOT)}")
+    models_by_id = {model["id"]: model for model in models}
+    for model in models:
+        model_id = model["id"]
+        target_dir = MODEL_ROOT / model_id
+        if model.get("distribution") == "local-artifact" and not target_dir.is_dir():
+            continue
         runtime_config = model.get("runtime_config")
         if runtime_config is not None:
             source_config = target_dir / runtime_config["source"]
             target_config = target_dir / runtime_config["target"]
             config = json.loads(source_config.read_text(encoding="utf-8"))
-            tokenizer_dir = (MODEL_ROOT / runtime_config["tokenizer_model"]).resolve()
-            config["model_name"] = str(tokenizer_dir)
+            tokenizer_model = models_by_id[runtime_config["tokenizer_model"]]
+            tokenizer_dir = MODEL_ROOT / tokenizer_model["id"]
+            if tokenizer_dir != target_dir:
+                for file_spec in tokenizer_model["files"]:
+                    source = tokenizer_dir / file_spec["path"]
+                    destination = target_dir / file_spec["path"]
+                    if not validate_file(source, file_spec):
+                        raise ValueError(f"tokenizer dependency failed verification: {source}")
+                    shutil.copyfile(source, destination)
             target_config.write_text(
                 json.dumps(config, ensure_ascii=False, indent=2) + "\n",
                 encoding="utf-8",

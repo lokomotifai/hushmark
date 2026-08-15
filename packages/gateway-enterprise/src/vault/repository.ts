@@ -17,6 +17,14 @@ export interface EncryptedVaultRecord {
 }
 
 export interface VaultRepository {
+  getSessionKey(scope: VaultScope): Promise<string | null>;
+  claimSessionKey(scope: VaultScope, candidateWrappedKey: string): Promise<string>;
+  allocatePlaceholder(
+    scope: VaultScope,
+    label: string,
+    suffix: string,
+    minimum: number,
+  ): Promise<string>;
   put(record: EncryptedVaultRecord): Promise<void>;
   get(scope: VaultScope, placeholder: string): Promise<EncryptedVaultRecord | null>;
   getByValueHmac(
@@ -30,6 +38,43 @@ export interface VaultRepository {
 
 export class MemoryVaultRepository implements VaultRepository {
   readonly #records = new Map<string, EncryptedVaultRecord>();
+  readonly #sessionKeys = new Map<string, string>();
+  readonly #placeholderCounters = new Map<string, number>();
+
+  getSessionKey(scope: VaultScope): Promise<string | null> {
+    return Promise.resolve(this.#sessionKeys.get(sessionKey(scope)) ?? null);
+  }
+
+  claimSessionKey(scope: VaultScope, candidateWrappedKey: string): Promise<string> {
+    const session = sessionKey(scope);
+    const existing = this.#sessionKeys.get(session);
+    if (existing !== undefined) return Promise.resolve(existing);
+    this.#sessionKeys.set(session, candidateWrappedKey);
+    return Promise.resolve(candidateWrappedKey);
+  }
+
+  allocatePlaceholder(
+    scope: VaultScope,
+    label: string,
+    suffix: string,
+    minimum: number,
+  ): Promise<string> {
+    const counterKey = `${sessionKey(scope)}\0${label}\0${suffix}`;
+    let current = this.#placeholderCounters.get(counterKey);
+    if (current === undefined) {
+      current = 0;
+      const pattern = new RegExp(`^\\[${label}_([1-9][0-9]{0,4})\\]${suffix}$`, "u");
+      for (const record of this.#records.values()) {
+        if (record.tenantId !== scope.tenantId || record.sessionId !== scope.sessionId) continue;
+        const match = pattern.exec(record.placeholder);
+        if (match?.[1] !== undefined) current = Math.max(current, Number(match[1]));
+      }
+    }
+    const next = Math.max(current + 1, minimum);
+    if (next > 99_999) throw new Error("vault placeholder space exhausted");
+    this.#placeholderCounters.set(counterKey, next);
+    return Promise.resolve(`[${label}_${String(next)}]${suffix}`);
+  }
 
   put(record: EncryptedVaultRecord): Promise<void> {
     this.#records.set(key(record, record.placeholder), cloneRecord(record));
@@ -80,6 +125,53 @@ export class MemoryVaultRepository implements VaultRepository {
 
 export class SqlVaultRepository implements VaultRepository {
   constructor(private readonly sql: SqlExecutor) {}
+
+  async getSessionKey(scope: VaultScope): Promise<string | null> {
+    const result = await this.sql.query<{ wrapped_key: string }>(
+      `SELECT wrapped_key FROM vault_session_keys
+       WHERE tenant_id = $1 AND session_id = $2`,
+      [scope.tenantId, scope.sessionId],
+    );
+    return result.rows[0]?.wrapped_key ?? null;
+  }
+
+  async claimSessionKey(scope: VaultScope, candidateWrappedKey: string): Promise<string> {
+    await this.sql.query(
+      `INSERT INTO vault_session_keys (tenant_id, session_id, wrapped_key)
+       VALUES ($1, $2, $3) ON CONFLICT (tenant_id, session_id) DO NOTHING`,
+      [scope.tenantId, scope.sessionId, candidateWrappedKey],
+    );
+    const result = await this.sql.query<{ wrapped_key: string }>(
+      `SELECT wrapped_key FROM vault_session_keys
+       WHERE tenant_id = $1 AND session_id = $2`,
+      [scope.tenantId, scope.sessionId],
+    );
+    const wrapped = result.rows[0]?.wrapped_key;
+    if (wrapped === undefined) throw new Error("vault session key claim failed");
+    return wrapped;
+  }
+
+  async allocatePlaceholder(
+    scope: VaultScope,
+    label: string,
+    suffix: string,
+    minimum: number,
+  ): Promise<string> {
+    const result = await this.sql.query<{ next_value: string | number }>(
+      `INSERT INTO vault_placeholder_counters
+       (tenant_id, session_id, label, suffix, next_value)
+       VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT (tenant_id, session_id, label, suffix) DO UPDATE
+       SET next_value = GREATEST(vault_placeholder_counters.next_value + 1, EXCLUDED.next_value)
+       RETURNING next_value`,
+      [scope.tenantId, scope.sessionId, label, suffix, minimum],
+    );
+    const next = Number(result.rows[0]?.next_value);
+    if (!Number.isInteger(next) || next < 1 || next > 99_999) {
+      throw new Error("vault placeholder space exhausted");
+    }
+    return `[${label}_${String(next)}]${suffix}`;
+  }
 
   async put(record: EncryptedVaultRecord): Promise<void> {
     await this.sql.query(
@@ -178,6 +270,10 @@ function fromRow(row: VaultRow): EncryptedVaultRecord {
 
 function key(scope: VaultScope, placeholder: string): string {
   return `${scope.tenantId}\0${scope.sessionId}\0${placeholder}`;
+}
+
+function sessionKey(scope: VaultScope): string {
+  return `${scope.tenantId}\0${scope.sessionId}`;
 }
 
 function cloneRecord(record: EncryptedVaultRecord): EncryptedVaultRecord {

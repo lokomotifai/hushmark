@@ -7,62 +7,70 @@ Secrets should come from a secret manager or Kubernetes Secret, never a committe
 
 ## Core
 
-| Variable                           | Default / requirement     | Meaning                                      |
-| ---------------------------------- | ------------------------- | -------------------------------------------- |
-| `HUSHMARK_CORE_BODY_LIMIT_BYTES`   | `1048576`                 | Validated core `body_limit_bytes` setting.   |
-| `HUSHMARK_CORE_HOST`               | `127.0.0.1`               | Validated core `host` setting.               |
-| `HUSHMARK_CORE_LOG_LEVEL`          | `info`                    | Validated core `log_level` setting.          |
-| `HUSHMARK_CORE_MAX_CONCURRENCY`    | `4`                       | Validated core `max_concurrency` setting.    |
-| `HUSHMARK_CORE_MODEL_ID`           | `hushmark-tr`             | Validated core `model_id` setting.           |
-| `HUSHMARK_CORE_MODEL_REGISTRY`     | `<repo>/core/models.yaml` | Validated core `model_registry` setting.     |
-| `HUSHMARK_CORE_MODEL_ROOT`         | `<repo>/models`           | Validated core `model_root` setting.         |
-| `HUSHMARK_CORE_NER_BACKEND`        | `torch`                   | Validated core `ner_backend` setting.        |
-| `HUSHMARK_CORE_NER_THRESHOLD`      | `0.55`                    | Validated core `ner_threshold` setting.      |
-| `HUSHMARK_CORE_NER_THRESHOLDS`     | `dynamic`                 | Validated core `ner_thresholds` setting.     |
-| `HUSHMARK_CORE_ONNX_MODEL_FILE`    | `model.onnx`              | Validated core `onnx_model_file` setting.    |
-| `HUSHMARK_CORE_PORT`               | `8000`                    | Validated core `port` setting.               |
-| `HUSHMARK_CORE_QUEUE_TIMEOUT_MS`   | `250`                     | Validated core `queue_timeout_ms` setting.   |
-| `HUSHMARK_CORE_SERVICE_TOKEN`      | `None`                    | Validated core `service_token` setting.      |
-| `HUSHMARK_CORE_SERVICE_TOKEN_FILE` | `None`                    | Validated core `service_token_file` setting. |
+| Variable                              | Default / requirement     | Meaning                                         |
+| ------------------------------------- | ------------------------- | ----------------------------------------------- |
+| `HUSHMARK_CORE_ALLOW_UNAUTHENTICATED` | `False`                   | Validated core `allow_unauthenticated` setting. |
+| `HUSHMARK_CORE_BODY_LIMIT_BYTES`      | `1048576`                 | Validated core `body_limit_bytes` setting.      |
+| `HUSHMARK_CORE_HOST`                  | `127.0.0.1`               | Validated core `host` setting.                  |
+| `HUSHMARK_CORE_LOG_LEVEL`             | `info`                    | Validated core `log_level` setting.             |
+| `HUSHMARK_CORE_MAX_CONCURRENCY`       | `4`                       | Validated core `max_concurrency` setting.       |
+| `HUSHMARK_CORE_MODEL_ID`              | `hushmark-tr`             | Validated core `model_id` setting.              |
+| `HUSHMARK_CORE_MODEL_REGISTRY`        | `<repo>/core/models.yaml` | Validated core `model_registry` setting.        |
+| `HUSHMARK_CORE_MODEL_ROOT`            | `<repo>/models`           | Validated core `model_root` setting.            |
+| `HUSHMARK_CORE_NER_BACKEND`           | `torch`                   | Validated core `ner_backend` setting.           |
+| `HUSHMARK_CORE_NER_THRESHOLD`         | `0.55`                    | Validated core `ner_threshold` setting.         |
+| `HUSHMARK_CORE_NER_THRESHOLDS`        | `dynamic`                 | Validated core `ner_thresholds` setting.        |
+| `HUSHMARK_CORE_ONNX_MODEL_FILE`       | `model.onnx`              | Validated core `onnx_model_file` setting.       |
+| `HUSHMARK_CORE_PORT`                  | `8000`                    | Validated core `port` setting.                  |
+| `HUSHMARK_CORE_QUEUE_TIMEOUT_MS`      | `250`                     | Validated core `queue_timeout_ms` setting.      |
+| `HUSHMARK_CORE_SERVICE_TOKEN`         | `None`                    | Validated core `service_token` setting.         |
+| `HUSHMARK_CORE_SERVICE_TOKEN_FILE`    | `None`                    | Validated core `service_token_file` setting.    |
 
 ## Gateway
 
-| Variable                         | Default / requirement          | Meaning                                               |
-| -------------------------------- | ------------------------------ | ----------------------------------------------------- |
-| `HUSHMARK_ANTHROPIC_API_KEY`     | `unset`                        | Optional upstream Anthropic credential.               |
-| `HUSHMARK_ANTHROPIC_UPSTREAM`    | `required`                     | Anthropic-compatible upstream base URL.               |
-| `HUSHMARK_API_KEYS`              | `required`                     | Comma-separated `hm_k1_…` client keys.                |
-| `HUSHMARK_BODY_LIMIT_BYTES`      | `1048576`                      | Maximum accepted gateway request body size.           |
-| `HUSHMARK_CORE_SERVICE_TOKEN`    | `unset`                        | Core service-to-service bearer credential.            |
-| `HUSHMARK_CORE_URL`              | `http://127.0.0.1:8000`        | Private core base URL.                                |
-| `HUSHMARK_GATEWAY_HOST`          | `0.0.0.0`                      | Gateway listen address.                               |
-| `HUSHMARK_GATEWAY_PORT`          | `8080`                         | Gateway listen port.                                  |
-| `HUSHMARK_OPENAI_API_KEY`        | `unset`                        | Optional upstream OpenAI bearer credential.           |
-| `HUSHMARK_OPENAI_UPSTREAM`       | `required`                     | OpenAI-compatible upstream base URL.                  |
-| `HUSHMARK_POLICY_PATH`           | `packages/gateway/policy.yaml` | Static policy file.                                   |
-| `HUSHMARK_RATE_LIMIT_MAX`        | `120`                          | Requests permitted in each gateway rate window.       |
-| `HUSHMARK_RATE_LIMIT_WINDOW_SEC` | `60`                           | Gateway rate-limit window in seconds.                 |
-| `HUSHMARK_TRUST_PROXY`           | `false`                        | Trust the direct reverse proxy for client IP parsing. |
-| `HUSHMARK_UNMASK_LIMIT`          | `100`                          | Maximum placeholder restorations per response.        |
-| `HUSHMARK_VAULT_MAX_ENTRIES`     | `100000`                       | Open vault LRU capacity.                              |
-| `HUSHMARK_VAULT_TTL_SEC`         | `86400`                        | Open vault entry TTL in seconds.                      |
+| Variable                               | Default / requirement          | Meaning                                                                      |
+| -------------------------------------- | ------------------------------ | ---------------------------------------------------------------------------- |
+| `HUSHMARK_ANTHROPIC_API_KEY`           | `unset`                        | Optional upstream Anthropic credential.                                      |
+| `HUSHMARK_ANTHROPIC_UPSTREAM`          | `required`                     | Anthropic-compatible upstream base URL.                                      |
+| `HUSHMARK_API_KEYS`                    | `required`                     | Comma-separated `hm_k1_…` client keys.                                       |
+| `HUSHMARK_BODY_LIMIT_BYTES`            | `1048576`                      | Maximum accepted gateway request body size.                                  |
+| `HUSHMARK_CORE_SERVICE_TOKEN`          | `unset`                        | Core service-to-service bearer credential.                                   |
+| `HUSHMARK_CORE_URL`                    | `http://127.0.0.1:8000`        | Private core base URL.                                                       |
+| `HUSHMARK_GATEWAY_HOST`                | `0.0.0.0`                      | Gateway listen address.                                                      |
+| `HUSHMARK_GATEWAY_PORT`                | `8080`                         | Gateway listen port.                                                         |
+| `HUSHMARK_OPENAI_API_KEY`              | `unset`                        | Optional upstream OpenAI bearer credential.                                  |
+| `HUSHMARK_OPENAI_UPSTREAM`             | `required`                     | OpenAI-compatible upstream base URL.                                         |
+| `HUSHMARK_POLICY_PATH`                 | `packages/gateway/policy.yaml` | Static policy file.                                                          |
+| `HUSHMARK_RATE_LIMIT_MAX`              | `120`                          | Requests permitted in each gateway rate window.                              |
+| `HUSHMARK_RATE_LIMIT_WINDOW_SEC`       | `60`                           | Gateway rate-limit window in seconds.                                        |
+| `HUSHMARK_STREAM_MAX_BUFFER_BYTES`     | `1048576`                      | Maximum pending SSE or structured stream buffer in bytes.                    |
+| `HUSHMARK_STREAM_MAX_STATES`           | `128`                          | Maximum concurrent structured stream fields.                                 |
+| `HUSHMARK_TRUST_PROXY_HOPS`            | `0`                            | Number of explicitly trusted reverse-proxy hops; keep 0 for direct exposure. |
+| `HUSHMARK_UNMASK_LIMIT`                | `100`                          | Maximum placeholder restorations per response.                               |
+| `HUSHMARK_UPSTREAM_BODY_TIMEOUT_MS`    | `60000`                        | Maximum upstream body inactivity time in milliseconds.                       |
+| `HUSHMARK_UPSTREAM_MAX_RESPONSE_BYTES` | `8388608`                      | Maximum buffered upstream JSON response size in bytes.                       |
+| `HUSHMARK_VAULT_MAX_ENTRIES`           | `100000`                       | Open vault LRU capacity.                                                     |
+| `HUSHMARK_VAULT_TTL_SEC`               | `86400`                        | Open vault entry TTL in seconds.                                             |
 
 ## Enterprise and console
 
-| Variable                           | Default / requirement   | Meaning                                                                                                   |
-| ---------------------------------- | ----------------------- | --------------------------------------------------------------------------------------------------------- |
-| `HUSHMARK_ADMIN_EMAIL`             | `required`              | Local administrator identity.                                                                             |
-| `HUSHMARK_ADMIN_PASSWORD`          | `required`              | Local administrator bootstrap password.                                                                   |
-| `HUSHMARK_AUDIT_HMAC_KEY_FILE`     | `required`              | Audit-chain HMAC key file path (at least 32 bytes); also required by `audit-verify` for protected chains. |
-| `HUSHMARK_DATABASE_URL`            | `required`              | PostgreSQL connection URL.                                                                                |
-| `HUSHMARK_GATEWAY_URL`             | `http://127.0.0.1:8080` | Console server-side gateway URL.                                                                          |
-| `HUSHMARK_KMS_KEY_ID`              | `required`              | Provider-specific wrapping key identifier.                                                                |
-| `HUSHMARK_KMS_KIND`                | `required`              | `vault`, `azure`, or `gcp`.                                                                               |
-| `HUSHMARK_LICENSE_FILE`            | `required`              | Signed offline license JSON path.                                                                         |
-| `HUSHMARK_LICENSE_PUBLIC_KEY_FILE` | `required`              | ed25519 verification key path.                                                                            |
-| `HUSHMARK_VAULT_ADDR`              | `provider-specific`     | Vault API address when KMS kind is Vault.                                                                 |
-| `HUSHMARK_VAULT_TOKEN`             | `secret`                | Vault token when KMS kind is Vault.                                                                       |
-| `HUSHMARK_VAULT_TRANSIT_MOUNT`     | `transit`               | Vault Transit mount name.                                                                                 |
+| Variable                              | Default / requirement   | Meaning                                                                                                   |
+| ------------------------------------- | ----------------------- | --------------------------------------------------------------------------------------------------------- |
+| `HUSHMARK_ADMIN_EMAIL`                | `required`              | Local administrator identity.                                                                             |
+| `HUSHMARK_ADMIN_PASSWORD`             | `required`              | Local administrator bootstrap password.                                                                   |
+| `HUSHMARK_AUDIT_CHECKPOINT_BOOTSTRAP` | `false`                 | One-time explicit opt-in to anchor an existing valid audit chain when no checkpoint exists.               |
+| `HUSHMARK_AUDIT_CHECKPOINT_FILE`      | `required`              | Append-only external audit-head checkpoint file; place it on storage outside PostgreSQL.                  |
+| `HUSHMARK_AUDIT_HMAC_KEY_FILE`        | `required`              | Audit-chain HMAC key file path (at least 32 bytes); also required by `audit-verify` for protected chains. |
+| `HUSHMARK_CONSOLE_ORIGIN`             | `request origin`        | Canonical public console origin used for admin CSRF validation; configure explicitly in production.       |
+| `HUSHMARK_DATABASE_URL`               | `required`              | PostgreSQL connection URL.                                                                                |
+| `HUSHMARK_GATEWAY_URL`                | `http://127.0.0.1:8080` | Console server-side gateway URL.                                                                          |
+| `HUSHMARK_KMS_KEY_ID`                 | `required`              | Provider-specific wrapping key identifier.                                                                |
+| `HUSHMARK_KMS_KIND`                   | `required`              | `vault`, `azure`, or `gcp`.                                                                               |
+| `HUSHMARK_LICENSE_FILE`               | `required`              | Signed offline license JSON path.                                                                         |
+| `HUSHMARK_LICENSE_PUBLIC_KEY_FILE`    | `required`              | ed25519 verification key path.                                                                            |
+| `HUSHMARK_VAULT_ADDR`                 | `provider-specific`     | Vault API address when KMS kind is Vault.                                                                 |
+| `HUSHMARK_VAULT_TOKEN`                | `secret`                | Vault token when KMS kind is Vault.                                                                       |
+| `HUSHMARK_VAULT_TRANSIT_MOUNT`        | `transit`               | Vault Transit mount name.                                                                                 |
 
 ## Policy file
 

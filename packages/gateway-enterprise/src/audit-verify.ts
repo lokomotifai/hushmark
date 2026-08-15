@@ -1,16 +1,23 @@
 import { readFile } from "node:fs/promises";
 
 import { PostgresExecutor } from "./db/client.js";
+import { FileAuditCheckpointStore } from "./audit/checkpoint.js";
 import { SqlAuditStore } from "./audit/store.js";
 import { AuditRecordSchema, type AuditRecord } from "./audit/types.js";
 import { verifyAuditChain } from "./audit/verify.js";
 
 const options = parseOptions(process.argv.slice(2));
 const records = await loadRecords();
-const integrityKeyFile = process.env.HUSHMARK_AUDIT_HMAC_KEY_FILE;
-const integrityKey =
-  integrityKeyFile === undefined ? undefined : await readIntegrityKey(integrityKeyFile);
-const result = verifyAuditChain(records, options.from, options.to, integrityKey);
+const integrityKeyFile = requiredEnv("HUSHMARK_AUDIT_HMAC_KEY_FILE");
+const integrityKey = await readIntegrityKey(integrityKeyFile);
+const checkpoint = await new FileAuditCheckpointStore(
+  requiredEnv("HUSHMARK_AUDIT_CHECKPOINT_FILE"),
+  integrityKey,
+).read();
+if (checkpoint === null && records.length > 0) {
+  throw new Error("external audit checkpoint is missing for a non-empty audit chain");
+}
+const result = verifyAuditChain(records, options.from, options.to, integrityKey, checkpoint);
 if (!result.ok) {
   process.stderr.write(`audit chain broken at seq ${String(result.firstBrokenSeq)}\n`);
   process.exitCode = 1;
@@ -66,4 +73,10 @@ function positiveInteger(value: string, label: string): number {
   if (!Number.isInteger(parsed) || parsed < 1)
     throw new Error(`${label} must be a positive integer`);
   return parsed;
+}
+
+function requiredEnv(name: string): string {
+  const value = process.env[name];
+  if (value === undefined || value.length === 0) throw new Error(`${name} is required`);
+  return value;
 }

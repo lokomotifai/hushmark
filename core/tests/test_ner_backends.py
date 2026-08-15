@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 from hushmark_core.ner.decode import decode_predictions
+from hushmark_core.ner.integrity import verify_runtime_artifacts
 from hushmark_core.ner.onnx_backend import OnnxNerBackend, OnnxUnsupported
 from hushmark_core.ner.registry import load_model_spec
 from hushmark_core.ner.torch_backend import TorchNerBackend
@@ -21,6 +22,11 @@ def test_registry_pins_adopted_hushmark_tr_artifacts() -> None:
     assert spec.onnx_file == "model.onnx"
     assert spec.onnx_size == 1157113250
     assert spec.onnx_sha256 == ("c5e72ca974f2e671325314f5a2d1d7eb2e1951ccd3d5250b0e223787f22c35ed")
+    assert (
+        "gliner_config.json",
+        2312,
+        "61a066493aa5b64280be2af4686337553e9f7119f5c77f52e301e8b0ce5c2577",
+    ) in spec.runtime_files
 
 
 def test_registry_pins_model_revision_hash_and_closed_labels() -> None:
@@ -72,6 +78,14 @@ def test_torch_backend_rejects_tampered_weights_before_import(tmp_path: Path) ->
     with pytest.raises(ValueError, match="size verification"):
         backend.load()
     assert backend.model_sha256 is None
+
+
+def test_runtime_integrity_rejects_tampered_config(tmp_path: Path) -> None:
+    spec = load_model_spec(ROOT / "core" / "models.yaml", "hushmark-tr")
+    filename, size, _sha256 = spec.runtime_files[0]
+    (tmp_path / filename).write_bytes(b"x" * size)
+    with pytest.raises(ValueError, match="SHA-256 verification"):
+        verify_runtime_artifacts(tmp_path, spec)
 
 
 def test_torch_and_onnx_backends_have_span_parity_on_turkish_fixture() -> None:

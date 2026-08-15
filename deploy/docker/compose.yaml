@@ -2,14 +2,18 @@ name: hushmark-evaluation
 
 x-readonly-service: &readonly-service
   restart: unless-stopped
+  init: true
   read_only: true
   security_opt:
     - no-new-privileges:true
+  cap_drop: [ALL]
   tmpfs:
     - /tmp:size=64m,mode=1777
+  networks: [evaluation]
 
 services:
   postgres:
+    <<: *readonly-service
     image: postgres:16.10-alpine@sha256:029660641a0cfc575b14f336ba448fb8a75fd595d42e1fa316b9fb4378742297
     environment:
       POSTGRES_DB: hushmark
@@ -18,6 +22,9 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - ../../packages/gateway-enterprise/drizzle/0000_initial.sql:/docker-entrypoint-initdb.d/0000_initial.sql:ro
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+      - /var/run/postgresql:size=16m,mode=0750,uid=70,gid=70
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U hushmark -d hushmark"]
       interval: 5s
@@ -25,6 +32,7 @@ services:
       retries: 20
 
   vault:
+    <<: *readonly-service
     image: hashicorp/vault:1.21@sha256:4e33b126a59c0c333b76fb4e894722462659a6bec7c48c9ee8cea56fccfd2569
     cap_add: [IPC_LOCK]
     environment:
@@ -39,6 +47,7 @@ services:
       retries: 20
 
   vault-init:
+    <<: *readonly-service
     image: hashicorp/vault:1.21@sha256:4e33b126a59c0c333b76fb4e894722462659a6bec7c48c9ee8cea56fccfd2569
     depends_on:
       vault:
@@ -52,7 +61,7 @@ services:
 
   core:
     <<: *readonly-service
-    image: hushmark/core:0.1.0-model
+    image: hushmark/core:0.1.1-model
     build:
       context: ../..
       dockerfile: deploy/docker/core.Dockerfile
@@ -74,7 +83,7 @@ services:
 
   fake-upstream:
     <<: *readonly-service
-    image: hushmark/gateway:0.1.0
+    image: hushmark/gateway:0.1.1
     entrypoint: ["node", "eval/fake-upstream.mjs"]
     environment:
       PORT: "9000"
@@ -89,7 +98,7 @@ services:
 
   gateway:
     <<: *readonly-service
-    image: hushmark/gateway:0.1.0
+    image: hushmark/gateway:0.1.1
     build:
       context: ../..
       dockerfile: deploy/docker/gateway.Dockerfile
@@ -117,6 +126,8 @@ services:
       HUSHMARK_KMS_KIND: vault
       HUSHMARK_KMS_KEY_ID: hushmark
       HUSHMARK_AUDIT_HMAC_KEY_FILE: /run/hushmark/license/audit-hmac-key
+      HUSHMARK_AUDIT_CHECKPOINT_FILE: /var/lib/hushmark/audit/checkpoints.ndjson
+      HUSHMARK_AUDIT_CHECKPOINT_BOOTSTRAP: "true"
       HUSHMARK_VAULT_ADDR: http://vault:8200
       HUSHMARK_VAULT_TOKEN: hushmark-evaluation-token
       HUSHMARK_ADMIN_EMAIL: admin@hushmark.local
@@ -125,12 +136,13 @@ services:
       HUSHMARK_ADMIN_SECURE_COOKIE: "false"
     volumes:
       - ./eval:/run/hushmark/license:ro
+      - audit-checkpoints:/var/lib/hushmark/audit
     ports:
       - "127.0.0.1:8080:8080"
 
   console:
     <<: *readonly-service
-    image: hushmark/console:0.1.0
+    image: hushmark/console:0.1.1
     build:
       context: ../..
       dockerfile: deploy/docker/console.Dockerfile
@@ -139,8 +151,14 @@ services:
         condition: service_healthy
     environment:
       HUSHMARK_GATEWAY_URL: http://gateway:8080
+      HUSHMARK_CONSOLE_ORIGIN: http://127.0.0.1:3000
     ports:
       - "127.0.0.1:3000:3000"
 
 volumes:
   postgres-data:
+  audit-checkpoints:
+
+networks:
+  evaluation:
+    internal: true

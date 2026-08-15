@@ -142,6 +142,11 @@ export class CachedPolicyEvaluator {
     return new StaticPolicyEvaluator(selected?.document ?? this.fallback).evaluate(type);
   }
 
+  async resolve(context: PolicyContext): Promise<StaticPolicy> {
+    const selected = await this.select(context);
+    return structuredClone(selected?.document ?? this.fallback);
+  }
+
   async upsert(policy: EnterprisePolicy): Promise<void> {
     await this.repository.upsert(EnterprisePolicySchema.parse(policy));
     this.invalidate();

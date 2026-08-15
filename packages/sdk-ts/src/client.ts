@@ -9,6 +9,7 @@ export interface HushmarkOptions {
   apiKey: string;
   sessionId?: string;
   fetch?: typeof globalThis.fetch;
+  allowInsecureHttp?: boolean;
 }
 
 export interface HushmarkClient {
@@ -21,7 +22,7 @@ export interface HushmarkClient {
 }
 
 export function createHushmark(options: HushmarkOptions): HushmarkClient {
-  const baseUrl = normalizeBaseUrl(options.baseUrl);
+  const baseUrl = normalizeBaseUrl(options.baseUrl, options.allowInsecureHttp ?? false);
   if (!options.apiKey.startsWith("hm_k1_") || options.apiKey.length <= "hm_k1_".length) {
     throw new TypeError("apiKey must be a non-empty hm_k1_ gateway key");
   }
@@ -72,7 +73,7 @@ export function createHushmark(options: HushmarkOptions): HushmarkClient {
   };
 }
 
-function normalizeBaseUrl(input: string): string {
+function normalizeBaseUrl(input: string, allowInsecureHttp: boolean): string {
   let url: URL;
   try {
     url = new URL(input);
@@ -82,10 +83,20 @@ function normalizeBaseUrl(input: string): string {
   if (url.protocol !== "http:" && url.protocol !== "https:") {
     throw new TypeError("baseUrl must be an absolute HTTP(S) URL");
   }
+  if (url.protocol === "http:" && !allowInsecureHttp && !isLoopback(url.hostname)) {
+    throw new TypeError(
+      "non-loopback baseUrl must use HTTPS; allowInsecureHttp is for isolated development only",
+    );
+  }
   url.pathname = url.pathname.replace(/\/+$/u, "");
   url.search = "";
   url.hash = "";
   return url.toString().replace(/\/$/u, "");
+}
+
+function isLoopback(hostname: string): boolean {
+  const normalized = hostname.toLowerCase().replace(/^\[|\]$/gu, "");
+  return normalized === "localhost" || normalized === "::1" || normalized.startsWith("127.");
 }
 
 function assertSessionId(value: string): void {

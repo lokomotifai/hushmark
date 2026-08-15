@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ipaddress
 from collections.abc import Mapping, Sequence
 from typing import Any, cast
 
@@ -46,9 +47,10 @@ class Hushmark:
         core_service_token: str | None = None,
         timeout: float = 10.0,
         transport: httpx.BaseTransport | None = None,
+        allow_insecure_http: bool = False,
     ) -> None:
-        self._core_url = _normalize_url(core_url)
-        self._gateway_url = _normalize_url(gateway_url)
+        self._core_url = _normalize_url(core_url, allow_insecure_http=allow_insecure_http)
+        self._gateway_url = _normalize_url(gateway_url, allow_insecure_http=allow_insecure_http)
         if not api_key.startswith("hm_k1_") or len(api_key) <= len("hm_k1_"):
             raise ValueError("api_key must be a non-empty hm_k1_ gateway key")
         self._api_key = api_key
@@ -151,11 +153,25 @@ class Hushmark:
         return cast(dict[str, Any], payload)
 
 
-def _normalize_url(value: str) -> str:
+def _normalize_url(value: str, *, allow_insecure_http: bool) -> str:
     url = httpx.URL(value)
     if url.scheme not in {"http", "https"} or not url.host:
         raise ValueError("service URLs must be absolute HTTP(S) URLs")
+    if url.scheme == "http" and not allow_insecure_http and not _is_loopback(url.host):
+        raise ValueError(
+            "non-loopback service URLs must use HTTPS; set allow_insecure_http only for "
+            "isolated development"
+        )
     return str(url).rstrip("/")
+
+
+def _is_loopback(host: str) -> bool:
+    if host.lower() == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return False
 
 
 def _error_from_response(response: httpx.Response) -> HushmarkError:

@@ -372,7 +372,7 @@ wheels = [
 
 [[package]]
 name = "hushmark-bench"
-version = "0.1.0"
+version = "0.1.1"
 source = { editable = "bench" }
 dependencies = [
     { name = "faker" },
@@ -389,7 +389,7 @@ requires-dist = [
 
 [[package]]
 name = "hushmark-codegen"
-version = "0.1.0"
+version = "0.1.1"
 source = { editable = "tools/codegen" }
 dependencies = [
     { name = "pyyaml" },
@@ -400,7 +400,7 @@ requires-dist = [{ name = "pyyaml", specifier = ">=6.0.2" }]
 
 [[package]]
 name = "hushmark-core"
-version = "0.1.0"
+version = "0.1.1"
 source = { editable = "core" }
 dependencies = [
     { name = "fastapi" },
@@ -436,7 +436,7 @@ requires-dist = [
 
 [[package]]
 name = "hushmark-sdk"
-version = "0.1.0"
+version = "0.1.1"
 source = { editable = "sdk-py" }
 dependencies = [
     { name = "httpx" },
@@ -447,7 +447,7 @@ requires-dist = [{ name = "httpx", specifier = ">=0.28.0" }]
 
 [[package]]
 name = "hushmark-workspace"
-version = "0.1.0"
+version = "0.1.1"
 source = { virtual = "." }
 
 [package.dev-dependencies]

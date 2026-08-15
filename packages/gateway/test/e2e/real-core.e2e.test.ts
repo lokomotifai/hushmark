@@ -33,6 +33,7 @@ it("round-trips against the real offline ONNX core over HTTP", async () => {
         TRANSFORMERS_OFFLINE: "1",
         HUSHMARK_CORE_NER_BACKEND: "onnx",
         HUSHMARK_CORE_LOG_LEVEL: "error",
+        HUSHMARK_CORE_ALLOW_UNAUTHENTICATED: "true",
         UV_CACHE_DIR: "/tmp/hushmark-uv-cache",
       },
       stdio: "ignore",

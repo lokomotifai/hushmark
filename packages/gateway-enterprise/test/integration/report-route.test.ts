@@ -10,7 +10,7 @@ it("exports an entitled PDF and records the export without content values", asyn
   close = () => runtime.app.close();
   const cookie = await login(runtime, "admin@example.test");
   const response = await runtime.app.inject({
-    method: "GET",
+    method: "POST",
     url: "/admin/reports/tedbir?from=2026-08-01&to=2026-08-31&format=pdf",
     headers: { cookie },
   });

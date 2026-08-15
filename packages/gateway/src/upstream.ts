@@ -50,7 +50,7 @@ export class HttpUpstream implements UpstreamPort {
         body: JSON.stringify(body),
         signal,
         headersTimeout: 30_000,
-        bodyTimeout: 0,
+        bodyTimeout: this.config.HUSHMARK_UPSTREAM_BODY_TIMEOUT_MS,
       });
       if (response.statusCode < 200 || response.statusCode >= 300) {
         await response.body.dump();

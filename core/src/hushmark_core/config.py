@@ -34,6 +34,7 @@ class Settings(BaseSettings):
     onnx_model_file: str = "model.onnx"
     service_token: SecretStr | None = None
     service_token_file: Path | None = None
+    allow_unauthenticated: bool = False
     body_limit_bytes: int = Field(default=1_048_576, ge=1, le=16_777_216)
     max_concurrency: int = Field(default=4, ge=1, le=128)
     queue_timeout_ms: int = Field(default=250, ge=1, le=30_000)
@@ -45,8 +46,13 @@ class Settings(BaseSettings):
             self.service_token = SecretStr(value)
         if self.service_token is not None and len(self.service_token.get_secret_value()) < 32:
             raise ValueError("HUSHMARK_CORE_SERVICE_TOKEN must contain at least 32 characters")
-        if self.host not in {"127.0.0.1", "::1", "localhost"} and self.service_token is None:
-            raise ValueError("HUSHMARK_CORE_SERVICE_TOKEN is required when core is network-exposed")
+        if self.service_token is None and not self.allow_unauthenticated:
+            raise ValueError(
+                "HUSHMARK_CORE_SERVICE_TOKEN is required unless explicit loopback-only "
+                "unauthenticated mode is enabled"
+            )
+        if self.allow_unauthenticated and self.host not in {"127.0.0.1", "::1", "localhost"}:
+            raise ValueError("unauthenticated core mode is restricted to loopback")
         return self
 
     @field_validator("ner_thresholds")

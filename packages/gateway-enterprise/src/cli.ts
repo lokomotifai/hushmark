@@ -5,6 +5,7 @@ import { EnvSchema, loadPolicy } from "@hushmark/gateway";
 
 import { hashSecret, SqlIdentityRepository } from "./admin/identity.js";
 import { SqlAdminSessions } from "./admin/session.js";
+import { FileAuditCheckpointStore } from "./audit/checkpoint.js";
 import { SqlAuditStore } from "./audit/store.js";
 import { applyMigrations, PostgresExecutor } from "./db/client.js";
 import { AzureKeyVaultKms } from "./kms/azureKeyVault.js";
@@ -25,6 +26,10 @@ const licenseFile = requiredEnv("HUSHMARK_LICENSE_FILE");
 const keyId = requiredEnv("HUSHMARK_KMS_KEY_ID");
 const auditIntegrityKeyFile = requiredEnv("HUSHMARK_AUDIT_HMAC_KEY_FILE");
 const auditIntegrityKey = await readIntegrityKey(auditIntegrityKeyFile);
+const auditCheckpointStore = new FileAuditCheckpointStore(
+  requiredEnv("HUSHMARK_AUDIT_CHECKPOINT_FILE"),
+  auditIntegrityKey,
+);
 const signedLicense: unknown = JSON.parse(await readFile(licenseFile, "utf8"));
 assertEvaluationArtifactsAreExplicit(config.HUSHMARK_API_KEYS, signedLicense);
 const executor = new PostgresExecutor(databaseUrl);
@@ -47,6 +52,8 @@ const runtime = await buildEnterpriseServer({
   vaultRepository: new SqlVaultRepository(executor),
   sessions: new SqlAdminSessions(executor),
   auditIntegrityKey,
+  auditCheckpointStore,
+  allowAuditCheckpointBootstrap: process.env.HUSHMARK_AUDIT_CHECKPOINT_BOOTSTRAP === "true",
   adminSecureCookies: process.env.HUSHMARK_ADMIN_SECURE_COOKIE !== "false",
 });
 runtime.app.addHook("onClose", () => executor.close());

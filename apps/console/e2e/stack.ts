@@ -11,6 +11,7 @@ import {
   buildEnterpriseServer,
   hashSecret,
   LocalTestKms,
+  MemoryAuditCheckpointStore,
   MemoryIdentityRepository,
   signLicensePayload,
   type Clock,
@@ -85,6 +86,8 @@ export async function startEnterpriseStack(): Promise<EnterpriseRuntime> {
     identity,
     kms: new LocalTestKms(),
     keyId: "console-test-key",
+    auditIntegrityKey: new Uint8Array(32).fill(9),
+    auditCheckpointStore: new MemoryAuditCheckpointStore(),
     publicKeyPem: publicKey.export({ type: "spki", format: "pem" }).toString(),
     clock,
     nowMs: () => clock.now().getTime(),
@@ -109,7 +112,11 @@ function config(): GatewayConfig {
     HUSHMARK_RATE_LIMIT_MAX: 120,
     HUSHMARK_RATE_LIMIT_WINDOW_SEC: 60,
     HUSHMARK_BODY_LIMIT_BYTES: 1_048_576,
-    HUSHMARK_TRUST_PROXY: false,
+    HUSHMARK_UPSTREAM_MAX_RESPONSE_BYTES: 8_388_608,
+    HUSHMARK_UPSTREAM_BODY_TIMEOUT_MS: 60_000,
+    HUSHMARK_STREAM_MAX_BUFFER_BYTES: 1_048_576,
+    HUSHMARK_STREAM_MAX_STATES: 128,
+    HUSHMARK_TRUST_PROXY_HOPS: 0,
   };
 }
 

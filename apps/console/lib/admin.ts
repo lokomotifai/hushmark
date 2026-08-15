@@ -127,6 +127,29 @@ export async function adminJson<T>(path: string, init?: RequestInit): Promise<T>
   return (await response.json()) as T;
 }
 
+export async function adminDownload(path: string, filename: string): Promise<void> {
+  const response = await fetch(`/api/admin/${path}`, { method: "POST", cache: "no-store" });
+  if (response.status === 401) {
+    window.location.assign("/login");
+    throw new Error("unauthorized");
+  }
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => null)) as {
+      error?: { message?: string };
+    } | null;
+    throw new Error(payload?.error?.message ?? `HTTP ${String(response.status)}`);
+  }
+  const url = URL.createObjectURL(await response.blob());
+  try {
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = filename;
+    anchor.click();
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
 export function policyActions(
   policy: EnterprisePolicy | undefined,
 ): Record<EntityType, PolicyAction> {

@@ -41,7 +41,7 @@ ve dağıtım sırlarını içermez.
 
 ## Kaynak ağacını doğrulama
 
-Gereksinimler: Node.js 22, pnpm 9, Python 3.12 ve uv.
+Gereksinimler: Node.js 22, pnpm 10, Python 3.12 ve uv.
 
 ```bash
 git clone https://github.com/lokomotifai/hushmark-open-core.git

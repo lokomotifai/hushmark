@@ -8,18 +8,21 @@ from collections import Counter
 
 from hushmark_core.recognizers.base import DetectorHit, ValidatorRecognizer
 
+_BASE64_CHARS = frozenset("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=")
+
 API_KEY_PATTERN = re.compile(
     r"(?<![A-Za-z0-9_])(?:sk-[A-Za-z0-9_-]{20,}|AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{30,})(?![A-Za-z0-9_])"
 )
 JWT_PATTERN = re.compile(
     r"(?<![A-Za-z0-9_-])eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+(?![A-Za-z0-9_-])"
 )
-PRIVATE_KEY_PATTERN = re.compile(
-    r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----\s+"
-    r"[A-Za-z0-9+/=\r\n]{16,}\s+"
-    r"-----END (?:RSA |EC |OPENSSH )?PRIVATE KEY-----",
-    flags=re.MULTILINE,
+PRIVATE_KEY_BEGIN_PATTERN = re.compile(
+    r"-----BEGIN (?P<label>(?:RSA |EC |OPENSSH )?PRIVATE KEY)-----[ \t]*\r?\n"
 )
+PRIVATE_KEY_LABELS = frozenset(
+    {"PRIVATE KEY", "RSA PRIVATE KEY", "EC PRIVATE KEY", "OPENSSH PRIVATE KEY"}
+)
+MAX_PRIVATE_KEY_BLOCK_CHARS = 65_536
 
 
 def shannon_entropy(value: str) -> float:
@@ -39,16 +42,42 @@ def validate_jwt(value: str) -> bool:
 
 
 def validate_private_key(value: str) -> bool:
-    match = PRIVATE_KEY_PATTERN.fullmatch(value)
-    if match is None:
-        return False
-    begin_label = re.search(r"BEGIN ([A-Z ]*PRIVATE KEY)", value)
-    end_label = re.search(r"END ([A-Z ]*PRIVATE KEY)", value)
-    return (
-        begin_label is not None
-        and end_label is not None
-        and begin_label.group(1) == end_label.group(1)
-    )
+    hits = detect_private_keys(value)
+    return len(hits) == 1 and hits[0].start == 0 and hits[0].end == len(value)
+
+
+def detect_private_keys(text: str) -> list[DetectorHit]:
+    """Scan bounded PEM blocks in linear time without ambiguous whitespace regexes."""
+
+    hits: list[DetectorHit] = []
+    cursor = 0
+    while cursor < len(text):
+        begin = PRIVATE_KEY_BEGIN_PATTERN.search(text, cursor)
+        if begin is None:
+            break
+        label = begin.group("label")
+        if label not in PRIVATE_KEY_LABELS:
+            cursor = begin.end()
+            continue
+        limit = min(len(text), begin.start() + MAX_PRIVATE_KEY_BLOCK_CHARS)
+        end_marker = f"-----END {label}-----"
+        end_start = text.find(end_marker, begin.end(), limit)
+        if end_start < 0:
+            cursor = limit
+            continue
+        body = text[begin.end() : end_start]
+        compact = body.replace("\r", "").replace("\n", "")
+        if len(compact) >= 16 and all(char in _BASE64_CHARS for char in compact):
+            hits.append(
+                DetectorHit(
+                    "SECRET_PRIVATE_KEY",
+                    begin.start(),
+                    end_start + len(end_marker),
+                    1.0,
+                )
+            )
+        cursor = end_start + len(end_marker)
+    return hits
 
 
 def detect_secrets(text: str) -> list[DetectorHit]:
@@ -62,11 +91,7 @@ def detect_secrets(text: str) -> list[DetectorHit]:
         for match in JWT_PATTERN.finditer(text)
         if validate_jwt(match.group())
     )
-    hits.extend(
-        DetectorHit("SECRET_PRIVATE_KEY", match.start(), match.end(), 1.0)
-        for match in PRIVATE_KEY_PATTERN.finditer(text)
-        if validate_private_key(match.group())
-    )
+    hits.extend(detect_private_keys(text))
     return hits
 
 

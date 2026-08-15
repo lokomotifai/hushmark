@@ -307,7 +307,7 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
         )
         if checkpoint_manifest.get("run_fingerprint") != fingerprint:
             raise ValueError("resume checkpoint does not match this run configuration")
-        state = torch.load(resume_checkpoint / "state.pt", map_location="cpu", weights_only=False)
+        state = torch.load(resume_checkpoint / "state.pt", map_location="cpu", weights_only=True)
         optimizer.load_state_dict(state["optimizer"])
         optimizer_to_device(optimizer, device)
         scheduler.load_state_dict(state["scheduler"])

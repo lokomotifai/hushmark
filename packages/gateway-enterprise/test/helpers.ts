@@ -11,6 +11,7 @@ import {
 import type { MaskRequest, MaskResponse } from "@hushmark/shared";
 
 import { hashSecret, MemoryIdentityRepository } from "../src/admin/identity.js";
+import { MemoryAuditCheckpointStore } from "../src/audit/checkpoint.js";
 import type { Clock } from "../src/audit/writer.js";
 import { LocalTestKms } from "../src/kms/local.js";
 import type { UnsignedLicense } from "../src/license/schema.js";
@@ -24,6 +25,7 @@ export const SESSION_ID = "019121aa-7c3e-7bbb-9a10-3f6e2b4c9d21";
 export const CANARY_NAME = "Ayşe Yılmaz";
 export const CANARY_TCKN = "10000000146";
 export const CANARY_IBAN = "TR330006100519786457841326";
+export const AUDIT_INTEGRITY_KEY = new Uint8Array(32).fill(9);
 export const DEMO_TEXT = `Müşterimiz ${CANARY_NAME} TCKN ${CANARY_TCKN} IBAN ${CANARY_IBAN}`;
 
 export class TestClock implements Clock {
@@ -45,7 +47,9 @@ export interface EnterpriseHarness {
   clock: TestClock;
 }
 
-export async function enterpriseHarness(): Promise<EnterpriseHarness> {
+export async function enterpriseHarness(
+  options: { adminRateLimitMax?: number } = {},
+): Promise<EnterpriseHarness> {
   const clock = new TestClock();
   const identity = new MemoryIdentityRepository();
   const passwordHash = await hashSecret(ADMIN_PASSWORD);
@@ -111,9 +115,14 @@ export async function enterpriseHarness(): Promise<EnterpriseHarness> {
     identity,
     kms: new LocalTestKms(),
     keyId: "test-master-key",
+    auditIntegrityKey: AUDIT_INTEGRITY_KEY,
+    auditCheckpointStore: new MemoryAuditCheckpointStore(),
     publicKeyPem: publicKey.export({ type: "spki", format: "pem" }).toString(),
     clock,
     nowMs: () => clock.now().getTime(),
+    ...(options.adminRateLimitMax === undefined
+      ? {}
+      : { adminRateLimitMax: options.adminRateLimitMax }),
   });
   return { runtime, identity, upstream, clock };
 }
@@ -145,7 +154,11 @@ export function testConfig(): GatewayConfig {
     HUSHMARK_RATE_LIMIT_MAX: 120,
     HUSHMARK_RATE_LIMIT_WINDOW_SEC: 60,
     HUSHMARK_BODY_LIMIT_BYTES: 1_048_576,
-    HUSHMARK_TRUST_PROXY: false,
+    HUSHMARK_UPSTREAM_MAX_RESPONSE_BYTES: 8_388_608,
+    HUSHMARK_UPSTREAM_BODY_TIMEOUT_MS: 60_000,
+    HUSHMARK_STREAM_MAX_BUFFER_BYTES: 1_048_576,
+    HUSHMARK_STREAM_MAX_STATES: 128,
+    HUSHMARK_TRUST_PROXY_HOPS: 0,
   };
 }
 

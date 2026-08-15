@@ -14,7 +14,7 @@ from collections.abc import Iterator
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = "0.1.0"
+VERSION = "0.1.1"
 BUNDLE_ROOT = f"hushmark-ac1-training-{VERSION}"
 ROOT_FILES = (
     ".python-version",

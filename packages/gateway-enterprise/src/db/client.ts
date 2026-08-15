@@ -65,6 +65,8 @@ export async function applyInitialMigration(executor: SqlExecutor): Promise<void
 export async function applyMigrations(executor: SqlExecutor): Promise<void> {
   const initial = await loadMigration("0000_initial.sql");
   const securityHardening = await loadMigration("0001_security_hardening.sql");
+  const vaultSessionKeys = await loadMigration("0002_vault_session_keys.sql");
+  const vaultPlaceholderCounters = await loadMigration("0003_vault_placeholder_counters.sql");
   const migrate = async (transaction: SqlExecutor, lock: boolean): Promise<void> => {
     if (lock) await transaction.query("SELECT pg_advisory_xact_lock($1)", [1_214_839_720]);
     await transaction.query(
@@ -91,6 +93,26 @@ export async function applyMigrations(executor: SqlExecutor): Promise<void> {
       await executeScript(transaction, securityHardening);
       await transaction.query("INSERT INTO hushmark_schema_migrations (version) VALUES ($1)", [
         "0001_security_hardening",
+      ]);
+    }
+    const vaultSessionKeysApplied = await transaction.query<{ version: string }>(
+      "SELECT version FROM hushmark_schema_migrations WHERE version = $1",
+      ["0002_vault_session_keys"],
+    );
+    if (vaultSessionKeysApplied.rows.length === 0) {
+      await executeScript(transaction, vaultSessionKeys);
+      await transaction.query("INSERT INTO hushmark_schema_migrations (version) VALUES ($1)", [
+        "0002_vault_session_keys",
+      ]);
+    }
+    const vaultPlaceholderCountersApplied = await transaction.query<{ version: string }>(
+      "SELECT version FROM hushmark_schema_migrations WHERE version = $1",
+      ["0003_vault_placeholder_counters"],
+    );
+    if (vaultPlaceholderCountersApplied.rows.length === 0) {
+      await executeScript(transaction, vaultPlaceholderCounters);
+      await transaction.query("INSERT INTO hushmark_schema_migrations (version) VALUES ($1)", [
+        "0003_vault_placeholder_counters",
       ]);
     }
   };

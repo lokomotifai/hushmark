@@ -16,7 +16,7 @@ Report vulnerabilities privately under [SECURITY.md](SECURITY.md).
 
 ## Verify a change
 
-Prerequisites are Node.js 22, pnpm 9, Python 3.12, and uv.
+Prerequisites are Node.js 22, pnpm 10, Python 3.12, and uv.
 
 ```bash
 ./scripts/bootstrap.sh

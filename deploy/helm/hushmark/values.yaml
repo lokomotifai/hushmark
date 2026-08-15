@@ -6,7 +6,7 @@ core:
   replicaCount: 1
   image:
     repository: hushmark/core
-    tag: 0.1.0-model
+    tag: 0.1.1-model
     digest: ""
     pullPolicy: IfNotPresent
   model:
@@ -31,7 +31,7 @@ gateway:
   replicaCount: 1
   image:
     repository: hushmark/gateway
-    tag: 0.1.0
+    tag: 0.1.1
     digest: ""
     pullPolicy: IfNotPresent
   service:
@@ -42,7 +42,7 @@ gateway:
   openaiApiKeyKey: openai-api-key
   anthropicApiKeyKey: anthropic-api-key
   coreServiceTokenKey: core-service-token
-  trustProxy: true
+  trustProxyHops: 0
   unmaskLimit: 100
   rateLimitMax: 120
   rateLimitWindowSec: 60
@@ -59,10 +59,11 @@ gateway:
 
 console:
   enabled: true
+  origin: http://localhost:3000
   replicaCount: 1
   image:
     repository: hushmark/console
-    tag: 0.1.0
+    tag: 0.1.1
     digest: ""
     pullPolicy: IfNotPresent
   service:
@@ -89,6 +90,8 @@ enterprise:
   adminPasswordKey: password
   auditHmacSecret: hushmark-audit
   auditHmacKey: hmac-key
+  auditCheckpointExistingClaim: ""
+  auditCheckpointBootstrap: false
   kms:
     kind: vault
     keyId: hushmark
@@ -122,3 +125,6 @@ postgres:
 
 networkPolicy:
   enabled: true
+  internalUpstreamPorts: [8200, 9000]
+  externalEgressCidrs: []
+  externalEgressPorts: [443]

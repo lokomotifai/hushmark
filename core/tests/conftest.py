@@ -4,3 +4,4 @@ import os
 
 if "HUSHMARK_CORE_NER_BACKEND" not in os.environ and "HUSHMARK_NER_BACKEND" not in os.environ:
     os.environ["HUSHMARK_CORE_NER_BACKEND"] = "disabled"
+os.environ.setdefault("HUSHMARK_CORE_ALLOW_UNAUTHENTICATED", "true")

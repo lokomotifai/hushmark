@@ -1,8 +1,15 @@
 import type { FastifyInstance } from "fastify";
-import { buildServer, type ServerDependencies, type StaticPolicy } from "@hushmark/gateway";
+import fastifyRateLimit from "@fastify/rate-limit";
+import {
+  buildServer,
+  GatewayError,
+  type ServerDependencies,
+  type StaticPolicy,
+} from "@hushmark/gateway";
 
 import { registerAdminRoutes } from "./admin/routes.js";
 import type { AdminSessionStore } from "./admin/session.js";
+import type { AuditCheckpointStore } from "./audit/checkpoint.js";
 import { sha256 } from "./audit/canonical.js";
 import type { IdentityRepository } from "./admin/identity.js";
 import { MemoryAuditStore, type AuditStore } from "./audit/store.js";
@@ -33,8 +40,11 @@ export interface EnterpriseServerDependencies {
   sessions?: AdminSessionStore;
   clock?: Clock;
   nowMs?: () => number;
-  auditIntegrityKey?: string | Uint8Array;
+  auditIntegrityKey: string | Uint8Array;
+  auditCheckpointStore: AuditCheckpointStore;
+  allowAuditCheckpointBootstrap?: boolean;
   adminSecureCookies?: boolean;
+  adminRateLimitMax?: number;
 }
 
 export interface EnterpriseRuntime {
@@ -53,8 +63,10 @@ export async function buildEnterpriseServer(
   const auditStore = dependencies.auditStore ?? new MemoryAuditStore();
   const audit = new AuditWriter(
     auditStore,
-    dependencies.clock ?? systemClock,
     dependencies.auditIntegrityKey,
+    dependencies.auditCheckpointStore,
+    dependencies.clock ?? systemClock,
+    dependencies.allowAuditCheckpointBootstrap ?? false,
   );
   const license = new LicenseGuard(
     dependencies.publicKeyPem ?? EMBEDDED_LICENSE_PUBLIC_KEY,
@@ -62,13 +74,7 @@ export async function buildEnterpriseServer(
     audit,
   );
   if (!(await license.load(dependencies.signedLicense))) {
-    return {
-      app: buildServer(dependencies.gateway),
-      enterprise: false,
-      auditStore,
-      audit,
-      license,
-    };
+    throw new Error("enterprise license verification failed");
   }
 
   const vault = new KmsEnvelopeVault(
@@ -95,8 +101,14 @@ export async function buildEnterpriseServer(
         entities: [],
       });
     },
+    policyForTenant: (apiKeyId) => policies.resolve({ apiKeyId }),
     vault,
     onMaskEvent: (event) => audit.appendMaskEvent(event).then(() => undefined),
+  });
+  await app.register(fastifyRateLimit, {
+    global: false,
+    keyGenerator: (request) => request.ip,
+    errorResponseBuilder: () => new GatewayError("HM-4290", "admin request rate limit exceeded"),
   });
   registerAdminRoutes(app, {
     identity: dependencies.identity,
@@ -112,6 +124,9 @@ export async function buildEnterpriseServer(
     ...(dependencies.adminSecureCookies === undefined
       ? {}
       : { secureCookies: dependencies.adminSecureCookies }),
+    ...(dependencies.adminRateLimitMax === undefined
+      ? {}
+      : { requestRateLimitMax: dependencies.adminRateLimitMax }),
   });
   const stopSweeper = startVaultSweeper(vault);
   app.addHook("onClose", () => stopSweeper());

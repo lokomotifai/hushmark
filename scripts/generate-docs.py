@@ -29,7 +29,23 @@ GATEWAY_DESCRIPTIONS = {
     "HUSHMARK_RATE_LIMIT_MAX": ("120", "Requests permitted in each gateway rate window."),
     "HUSHMARK_RATE_LIMIT_WINDOW_SEC": ("60", "Gateway rate-limit window in seconds."),
     "HUSHMARK_BODY_LIMIT_BYTES": ("1048576", "Maximum accepted gateway request body size."),
-    "HUSHMARK_TRUST_PROXY": ("false", "Trust the direct reverse proxy for client IP parsing."),
+    "HUSHMARK_UPSTREAM_MAX_RESPONSE_BYTES": (
+        "8388608",
+        "Maximum buffered upstream JSON response size in bytes.",
+    ),
+    "HUSHMARK_UPSTREAM_BODY_TIMEOUT_MS": (
+        "60000",
+        "Maximum upstream body inactivity time in milliseconds.",
+    ),
+    "HUSHMARK_STREAM_MAX_BUFFER_BYTES": (
+        "1048576",
+        "Maximum pending SSE or structured stream buffer in bytes.",
+    ),
+    "HUSHMARK_STREAM_MAX_STATES": ("128", "Maximum concurrent structured stream fields."),
+    "HUSHMARK_TRUST_PROXY_HOPS": (
+        "0",
+        "Number of explicitly trusted reverse-proxy hops; keep 0 for direct exposure.",
+    ),
 }
 
 ENTERPRISE_ROWS = {
@@ -40,6 +56,15 @@ ENTERPRISE_ROWS = {
         "Audit-chain HMAC key file path (at least 32 bytes); also required by "
         "`audit-verify` for protected chains.",
     ),
+    "HUSHMARK_AUDIT_CHECKPOINT_FILE": (
+        "required",
+        "Append-only external audit-head checkpoint file; place it on storage outside PostgreSQL.",
+    ),
+    "HUSHMARK_AUDIT_CHECKPOINT_BOOTSTRAP": (
+        "false",
+        "One-time explicit opt-in to anchor an existing valid audit chain when no "
+        "checkpoint exists.",
+    ),
     "HUSHMARK_DATABASE_URL": ("required", "PostgreSQL connection URL."),
     "HUSHMARK_KMS_KIND": ("required", "`vault`, `azure`, or `gcp`."),
     "HUSHMARK_KMS_KEY_ID": ("required", "Provider-specific wrapping key identifier."),
@@ -49,6 +74,11 @@ ENTERPRISE_ROWS = {
     "HUSHMARK_VAULT_TOKEN": ("secret", "Vault token when KMS kind is Vault."),
     "HUSHMARK_VAULT_TRANSIT_MOUNT": ("transit", "Vault Transit mount name."),
     "HUSHMARK_GATEWAY_URL": ("http://127.0.0.1:8080", "Console server-side gateway URL."),
+    "HUSHMARK_CONSOLE_ORIGIN": (
+        "request origin",
+        "Canonical public console origin used for admin CSRF validation; configure "
+        "explicitly in production.",
+    ),
 }
 
 ROUTE_DESCRIPTIONS = {
@@ -70,12 +100,12 @@ ROUTE_DESCRIPTIONS = {
     ("GET", "/admin/providers"): "List provider configuration metadata.",
     ("POST", "/admin/providers"): "Update provider configuration metadata.",
     ("GET", "/admin/audit/events"): "Page through no-value audit events.",
-    ("GET", "/admin/audit/export"): "Export audit NDJSON.",
+    ("POST", "/admin/audit/export"): "Export audit NDJSON.",
     ("GET", "/admin/audit/verify"): "Verify the current audit chain.",
     ("POST", "/admin/vault/resolve"): "Role-gated placeholder resolution.",
     ("GET", "/admin/license"): "Inspect license state and entitlements.",
     ("GET", "/admin/metrics/summary"): "Aggregate dashboard counters.",
-    ("GET", "/admin/reports/tedbir"): "Generate an entitled Tedbir PDF.",
+    ("POST", "/admin/reports/tedbir"): "Generate an entitled Tedbir PDF.",
 }
 
 

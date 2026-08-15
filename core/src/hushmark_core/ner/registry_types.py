@@ -27,3 +27,6 @@ class ModelSpecLike(Protocol):
 
     @property
     def onnx_sha256(self) -> str: ...
+
+    @property
+    def runtime_files(self) -> tuple[tuple[str, int, str], ...]: ...

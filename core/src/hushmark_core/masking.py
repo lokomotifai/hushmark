@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import hashlib
 import re
+import secrets
 import unicodedata
 from dataclasses import dataclass
 from typing import Literal
@@ -38,9 +38,11 @@ class MaskResult:
     mappings: list[MappingRecord]
 
 
-def collision_suffix(session: str, text: str) -> str:
-    material = f"{session}\0{text}".encode()
-    return hashlib.sha256(material).hexdigest()[:16]
+MAX_ENTITIES_PER_ITEM = 4_096
+
+
+def collision_suffix() -> str:
+    return secrets.token_hex(8)
 
 
 def mask_text(
@@ -57,13 +59,21 @@ def mask_text(
     if collision is not None:
         if collision_mode == "reject":
             raise PlaceholderCollision("placeholder grammar already exists in input")
-        suffix = f"#{collision_suffix(session, text)}"
+        suffix = f"#{collision_suffix()}"
+
+    if len(entities) > MAX_ENTITIES_PER_ITEM:
+        raise ValueError("entity budget exceeded")
 
     counters: dict[str, int] = {}
     value_to_placeholder: dict[tuple[str, str], str] = {}
     mappings: list[MappingRecord] = []
     replacements: list[tuple[int, int, str]] = []
-    for entity in sorted(entities, key=lambda item: (item.start, item.end)):
+    ordered = sorted(entities, key=lambda item: (item.start, item.end))
+    previous_end = 0
+    for entity in ordered:
+        if entity.start < previous_end or entity.start < 0 or entity.end > len(text):
+            raise ValueError("entity spans must be ordered, non-overlapping, and in bounds")
+        previous_end = entity.end
         if entity.type not in TAXONOMY:
             raise ValueError(f"cannot mask unknown entity type: {entity.type}")
         value = text[entity.start : entity.end]
@@ -88,9 +98,13 @@ def mask_text(
         )
         replacements.append((entity.start, entity.end, placeholder))
 
-    masked_text = text
-    for start, end, placeholder in reversed(replacements):
-        masked_text = masked_text[:start] + placeholder + masked_text[end:]
+    parts: list[str] = []
+    cursor = 0
+    for start, end, placeholder in replacements:
+        parts.extend((text[cursor:start], placeholder))
+        cursor = end
+    parts.append(text[cursor:])
+    masked_text = "".join(parts)
     return MaskResult(masked_text=masked_text, mappings=mappings)
 
 

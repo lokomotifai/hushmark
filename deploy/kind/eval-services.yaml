@@ -5,7 +5,7 @@ spec:
   replicas: 1
   selector: { matchLabels: { app: vault } }
   template:
-    metadata: { labels: { app: vault } }
+    metadata: { labels: { app: vault, hushmark.ai/gateway-upstream: "true" } }
     spec:
       containers:
         - name: vault
@@ -32,13 +32,13 @@ spec:
   replicas: 1
   selector: { matchLabels: { app: fake-upstream } }
   template:
-    metadata: { labels: { app: fake-upstream } }
+    metadata: { labels: { app: fake-upstream, hushmark.ai/gateway-upstream: "true" } }
     spec:
       automountServiceAccountToken: false
       securityContext: { runAsNonRoot: true, runAsUser: 10001, runAsGroup: 10001 }
       containers:
         - name: fake-upstream
-          image: hushmark/gateway:0.1.0
+          image: hushmark/gateway:0.1.1
           imagePullPolicy: Never
           command: ["node", "/opt/hushmark-eval/fake-upstream.mjs"]
           env: [{ name: PORT, value: "9000" }]
@@ -60,3 +60,11 @@ metadata: { name: fake-upstream }
 spec:
   selector: { app: fake-upstream }
   ports: [{ name: http, port: 9000, targetPort: http }]
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata: { name: hushmark-audit-checkpoint }
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests: { storage: 1Gi }

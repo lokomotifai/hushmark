@@ -40,6 +40,18 @@ def test_environment_namespace(monkeypatch: object) -> None:
 
 def test_network_exposure_requires_a_long_service_token() -> None:
     with pytest.raises(ValidationError, match="SERVICE_TOKEN"):
-        Settings(host="0.0.0.0")
-    settings = Settings(host="0.0.0.0", service_token="x" * 32)
+        Settings(host="0.0.0.0", allow_unauthenticated=False)
+    settings = Settings(host="0.0.0.0", service_token="x" * 32, allow_unauthenticated=False)
     assert settings.service_token is not None
+
+
+def test_default_runtime_requires_authentication(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("HUSHMARK_CORE_ALLOW_UNAUTHENTICATED", raising=False)
+    with pytest.raises(ValidationError, match="explicit loopback-only"):
+        Settings()
+
+
+def test_explicit_unauthenticated_mode_is_loopback_only() -> None:
+    assert Settings(allow_unauthenticated=True).service_token is None
+    with pytest.raises(ValidationError, match="restricted to loopback"):
+        Settings(host="0.0.0.0", allow_unauthenticated=True)

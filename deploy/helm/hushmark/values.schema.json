@@ -15,8 +15,13 @@
     "networkPolicy": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["enabled"],
-      "properties": { "enabled": { "type": "boolean" } }
+      "required": ["enabled", "internalUpstreamPorts", "externalEgressCidrs", "externalEgressPorts"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "internalUpstreamPorts": { "type": "array", "items": { "type": "integer", "minimum": 1, "maximum": 65535 }, "uniqueItems": true },
+        "externalEgressCidrs": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+        "externalEgressPorts": { "type": "array", "items": { "type": "integer", "minimum": 1, "maximum": 65535 }, "uniqueItems": true }
+      }
     }
   },
   "$defs": {
@@ -65,7 +70,7 @@
     "workloadGateway": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["replicaCount", "image", "service", "existingSecret", "apiKeyKey", "openaiApiKeyKey", "anthropicApiKeyKey", "coreServiceTokenKey", "trustProxy", "unmaskLimit", "rateLimitMax", "rateLimitWindowSec", "bodyLimitBytes", "openaiUpstream", "anthropicUpstream", "resources"],
+      "required": ["replicaCount", "image", "service", "existingSecret", "apiKeyKey", "openaiApiKeyKey", "anthropicApiKeyKey", "coreServiceTokenKey", "trustProxyHops", "unmaskLimit", "rateLimitMax", "rateLimitWindowSec", "bodyLimitBytes", "openaiUpstream", "anthropicUpstream", "resources"],
       "properties": {
         "replicaCount": { "type": "integer", "minimum": 1 },
         "image": { "$ref": "#/$defs/image" },
@@ -75,7 +80,7 @@
         "openaiApiKeyKey": { "type": "string", "minLength": 1 },
         "anthropicApiKeyKey": { "type": "string", "minLength": 1 },
         "coreServiceTokenKey": { "type": "string", "minLength": 1 },
-        "trustProxy": { "type": "boolean" },
+        "trustProxyHops": { "type": "integer", "minimum": 0, "maximum": 4 },
         "unmaskLimit": { "type": "integer", "minimum": 1, "maximum": 1000 },
         "rateLimitMax": { "type": "integer", "minimum": 1 },
         "rateLimitWindowSec": { "type": "integer", "minimum": 1 },
@@ -88,9 +93,10 @@
     "workloadConsole": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["enabled", "replicaCount", "image", "service", "resources"],
+      "required": ["enabled", "origin", "replicaCount", "image", "service", "resources"],
       "properties": {
         "enabled": { "type": "boolean" },
+        "origin": { "type": "string", "format": "uri" },
         "replicaCount": { "type": "integer", "minimum": 1 },
         "image": { "$ref": "#/$defs/image" },
         "service": { "$ref": "#/$defs/service" },
@@ -100,7 +106,7 @@
     "enterprise": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["enabled", "evaluationMode", "licenseSecret", "licenseKey", "publicKeyKey", "databaseSecret", "databaseUrlKey", "adminEmail", "adminSecret", "adminPasswordKey", "auditHmacSecret", "auditHmacKey", "kms"],
+      "required": ["enabled", "evaluationMode", "licenseSecret", "licenseKey", "publicKeyKey", "databaseSecret", "databaseUrlKey", "adminEmail", "adminSecret", "adminPasswordKey", "auditHmacSecret", "auditHmacKey", "auditCheckpointExistingClaim", "auditCheckpointBootstrap", "kms"],
       "properties": {
         "enabled": { "type": "boolean" },
         "evaluationMode": { "type": "boolean" },
@@ -114,6 +120,8 @@
         "adminPasswordKey": { "type": "string" },
         "auditHmacSecret": { "type": "string", "minLength": 1 },
         "auditHmacKey": { "type": "string", "minLength": 1 },
+        "auditCheckpointExistingClaim": { "type": "string" },
+        "auditCheckpointBootstrap": { "type": "boolean" },
         "kms": {
           "type": "object",
           "additionalProperties": false,

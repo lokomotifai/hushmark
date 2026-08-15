@@ -16,3 +16,7 @@ legal compliance, and detection can miss or misclassify content. Evaluate the pu
 and representative local data before production use.
 
 Licensed under Apache-2.0.
+
+The HTTP service is authenticated by default. Set a 32-character-or-longer
+`HUSHMARK_CORE_SERVICE_TOKEN`, or opt into unauthenticated local development with
+`HUSHMARK_CORE_ALLOW_UNAUTHENTICATED=true` while binding only to loopback.

@@ -15,6 +15,7 @@ import type { KmsEnvelopeVault } from "../vault/kmsEnvelope.js";
 import {
   issueApiKey,
   hashSecret,
+  type AdminUser,
   type IdentityRepository,
   type ProviderRecord,
   verifySecret,
@@ -70,6 +71,7 @@ export interface AdminRouteDependencies {
   sessions?: AdminSessionStore;
   now?: () => Date;
   rateLimiter?: RateLimiter;
+  requestRateLimitMax?: number;
   secureCookies?: boolean;
 }
 
@@ -84,6 +86,7 @@ export function registerAdminRoutes(
   const secureCookie = dependencies.secureCookies ?? true;
   const cookieSecurity = secureCookie ? "; Secure" : "";
   const dummyPasswordHash = hashSecret(randomUUID());
+  const passwordWork = new ConcurrencyGate(4);
 
   const authenticate = async (request: FastifyRequest): Promise<void> => {
     const token = cookieValue(request.headers.cookie, "hm_admin");
@@ -105,25 +108,33 @@ export function registerAdminRoutes(
     return principal;
   };
   const adminRoute = {
-    config: { hushmarkAuth: "admin" as const },
+    config: {
+      hushmarkAuth: "admin" as const,
+      rateLimit: { max: dependencies.requestRateLimitMax ?? 300, timeWindow: 60_000 },
+    },
     preHandler: authenticate,
   };
 
   app.post(
     "/admin/auth/login",
-    { config: { hushmarkAuth: "public" as const } },
+    {
+      config: {
+        hushmarkAuth: "public" as const,
+        rateLimit: { max: 30, timeWindow: 60_000 },
+      },
+    },
     async (request, reply) => {
       const input = LoginSchema.parse(request.body);
       const normalizedEmail = input.email.normalize("NFC").toLowerCase();
       const emailFingerprint = sha256(normalizedEmail);
       const ipFingerprint = sha256(request.ip);
-      const allowedByIp = await rateLimiter.consume(`admin-login-ip:${ipFingerprint}`, 10, 60_000);
-      const allowedByAccount = await rateLimiter.consume(
-        `admin-login-account:${emailFingerprint}`,
-        5,
-        15 * 60_000,
-      );
-      if (!allowedByIp || !allowedByAccount) {
+      const globalKey = "admin-login-global";
+      const ipKey = `admin-login-ip:${ipFingerprint}`;
+      const accountKey = `admin-login-account:${emailFingerprint}`;
+      const allowedGlobally = await rateLimiter.consume(globalKey, 60, 60_000);
+      const allowedByIp = await rateLimiter.consume(ipKey, 30, 60_000);
+      const allowedByAccount = await rateLimiter.consume(accountKey, 10, 15 * 60_000);
+      if (!allowedGlobally || !allowedByIp || !allowedByAccount || !passwordWork.tryAcquire()) {
         await dependencies.audit.append({
           kind: "LOGIN_FAILED",
           actor: `anonymous:${emailFingerprint.slice(0, 16)}`,
@@ -133,9 +144,15 @@ export function registerAdminRoutes(
         });
         throw new GatewayError("HM-4290", "admin login rate limit exceeded");
       }
-      const user = await dependencies.identity.findUserByEmail(input.email);
-      const passwordHash = user?.enabled === true ? user.passwordHash : await dummyPasswordHash;
-      const passwordMatches = await verifySecret(passwordHash, input.password);
+      let user: AdminUser | null;
+      let passwordMatches: boolean;
+      try {
+        user = await dependencies.identity.findUserByEmail(input.email);
+        const passwordHash = user?.enabled === true ? user.passwordHash : await dummyPasswordHash;
+        passwordMatches = await verifySecret(passwordHash, input.password);
+      } finally {
+        passwordWork.release();
+      }
       if (user === null || !user.enabled || !passwordMatches) {
         await dependencies.audit.append({
           kind: "LOGIN_FAILED",
@@ -149,6 +166,7 @@ export function registerAdminRoutes(
         throw new GatewayError("HM-4010", "invalid email or password");
       }
       const token = await sessions.create({ userId: user.id, role: user.role });
+      await rateLimiter.reset?.(accountKey);
       reply.header(
         "set-cookie",
         `hm_admin=${token}; Path=/; HttpOnly${cookieSecurity}; SameSite=Strict; Max-Age=28800`,
@@ -251,7 +269,7 @@ export function registerAdminRoutes(
       total: result.total,
     };
   });
-  app.get("/admin/audit/export", adminRoute, async (request, reply) => {
+  app.post("/admin/audit/export", adminRoute, async (request, reply) => {
     const principal = principalFor(request);
     requireRole(principal.role, ["admin", "auditor"]);
     const range = AuditRangeSchema.parse(request.query);
@@ -317,7 +335,7 @@ export function registerAdminRoutes(
     };
   });
 
-  app.get("/admin/reports/tedbir", adminRoute, async (request, reply) => {
+  app.post("/admin/reports/tedbir", adminRoute, async (request, reply) => {
     const principal = principalFor(request);
     requireRole(principal.role, ["admin", "auditor"]);
     if (!dependencies.license.has("tedbir_report")) {
@@ -325,7 +343,7 @@ export function registerAdminRoutes(
     }
     const query = ReportQuerySchema.parse(request.query);
     await auditAdminChange(dependencies.audit, "EXPORT_RUN", principal, "tedbir-report");
-    const data = buildTedbirReportData(
+    const data = await buildTedbirReportData(
       await dependencies.auditStore.list(),
       query.from,
       query.to,
@@ -340,6 +358,23 @@ export function registerAdminRoutes(
     );
     return reply.send(pdf);
   });
+}
+
+class ConcurrencyGate {
+  #active = 0;
+
+  constructor(private readonly limit: number) {}
+
+  tryAcquire(): boolean {
+    if (this.#active >= this.limit) return false;
+    this.#active += 1;
+    return true;
+  }
+
+  release(): void {
+    if (this.#active <= 0) throw new Error("concurrency gate released without acquisition");
+    this.#active -= 1;
+  }
 }
 
 async function auditAdminChange(

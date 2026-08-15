@@ -3,7 +3,7 @@ import { createRequire } from "node:module";
 import { Document, Font, Page, StyleSheet, Text, View, renderToBuffer } from "@react-pdf/renderer";
 
 import type { AuditRecord } from "../audit/types.js";
-import { verifyAuditChain, type VerifyResult } from "../audit/verify.js";
+import type { VerifyResult } from "../audit/verify.js";
 
 const require = createRequire(import.meta.url);
 
@@ -40,17 +40,17 @@ export interface TedbirReportData {
   chain: { ok: boolean; verified: number; firstBrokenSeq: number | null };
 }
 
-export function buildTedbirReportData(
+export async function buildTedbirReportData(
   records: readonly AuditRecord[],
   from: string,
   to: string,
-  generatedAt = new Date().toISOString(),
+  generatedAt: string,
   verify: (
     records: readonly AuditRecord[],
     from: number,
     to: number | "latest",
-  ) => VerifyResult = verifyAuditChain,
-): TedbirReportData {
+  ) => Promise<VerifyResult> | VerifyResult,
+): Promise<TedbirReportData> {
   const fromMs = Date.parse(`${from}T00:00:00.000Z`);
   const toMs = Date.parse(`${to}T23:59:59.999Z`);
   if (!Number.isFinite(fromMs) || !Number.isFinite(toMs) || fromMs > toMs) {
@@ -68,7 +68,7 @@ export function buildTedbirReportData(
   }
   const rangeStart = selected.at(0)?.seq ?? 1;
   const rangeEnd = selected.at(-1)?.seq ?? "latest";
-  const chain = verify(records, rangeStart, rangeEnd);
+  const chain = await verify(records, rangeStart, rangeEnd);
   return {
     period: { from, to },
     generatedAt,

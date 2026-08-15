@@ -1,6 +1,6 @@
 [project]
 name = "hushmark-sdk"
-version = "0.1.0"
+version = "0.1.1"
 description = "Typed Python client for self-hosted Hushmark services"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"

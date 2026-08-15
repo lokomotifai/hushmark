@@ -82,3 +82,23 @@ def test_core_rejects_request_bodies_over_the_configured_limit(monkeypatch) -> N
         }
     finally:
         get_settings.cache_clear()
+
+
+def test_non_ascii_authorization_is_rejected_without_server_error(monkeypatch) -> None:
+    token = "core-service-token-with-at-least-32-characters"
+    monkeypatch.setenv("HUSHMARK_CORE_SERVICE_TOKEN", token)
+    get_settings.cache_clear()
+    try:
+        with TestClient(app) as client:
+            response = client.get(
+                "/v1/metadata",
+                headers={"authorization": b"Bearer \xe9"},
+            )
+        assert response.status_code == 401
+    finally:
+        get_settings.cache_clear()
+
+
+def test_openapi_schema_is_not_exposed() -> None:
+    with TestClient(app) as client:
+        assert client.get("/openapi.json").status_code == 404

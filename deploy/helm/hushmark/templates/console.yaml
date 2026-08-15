@@ -41,6 +41,8 @@ spec:
           env:
             - name: HUSHMARK_GATEWAY_URL
               value: {{ printf "http://%s-gateway:%v" (include "hushmark.fullname" .) .Values.gateway.service.port | quote }}
+            - name: HUSHMARK_CONSOLE_ORIGIN
+              value: {{ .Values.console.origin | quote }}
             - name: NEXT_TELEMETRY_DISABLED
               value: "1"
           ports:

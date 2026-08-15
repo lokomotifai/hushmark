@@ -1,6 +1,6 @@
 import { afterEach, expect, it } from "vitest";
 
-import { ADMIN_PASSWORD, enterpriseHarness } from "../helpers.js";
+import { ADMIN_PASSWORD, enterpriseHarness, login } from "../helpers.js";
 
 let close: (() => Promise<void>) | undefined;
 afterEach(async () => close?.());
@@ -22,7 +22,7 @@ it("rate-limits repeated admin login attempts and records a pseudonymous actor",
   const { runtime } = await enterpriseHarness();
   close = () => runtime.app.close();
   const responses = [];
-  for (let attempt = 0; attempt < 6; attempt += 1) {
+  for (let attempt = 0; attempt < 11; attempt += 1) {
     responses.push(
       await runtime.app.inject({
         method: "POST",
@@ -32,9 +32,32 @@ it("rate-limits repeated admin login attempts and records a pseudonymous actor",
       }),
     );
   }
-  expect(responses.slice(0, 5).every((response) => response.statusCode === 401)).toBe(true);
-  expect(responses[5]?.statusCode).toBe(429);
-  expect(responses[5]?.json()).toMatchObject({ error: { code: "HM-4290" } });
+  expect(responses.slice(0, 10).every((response) => response.statusCode === 401)).toBe(true);
+  expect(responses[10]?.statusCode).toBe(429);
+  expect(responses[10]?.json()).toMatchObject({ error: { code: "HM-4290" } });
   const events = await runtime.auditStore.list();
   expect(events.at(-1)?.actor).toMatch(/^anonymous:[0-9a-f]{16}$/u);
+});
+
+it("rate-limits authenticated admin requests by trusted client IP", async () => {
+  const { runtime } = await enterpriseHarness({ adminRateLimitMax: 2 });
+  close = () => runtime.app.close();
+  const cookie = await login(runtime, "admin@example.test");
+  const responses = [];
+  for (let request = 0; request < 3; request += 1) {
+    responses.push(
+      await runtime.app.inject({
+        method: "GET",
+        url: "/admin/metrics/summary",
+        headers: { cookie },
+      }),
+    );
+  }
+  expect(
+    responses.map((response) => response.statusCode).sort(),
+    responses.map((response) => response.body).join("\n"),
+  ).toEqual([200, 200, 429]);
+  expect(responses.find((response) => response.statusCode === 429)?.json()).toMatchObject({
+    error: { code: "HM-4290" },
+  });
 });

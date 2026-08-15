@@ -10,6 +10,7 @@ from typing import Protocol, cast
 
 from hushmark_core.ner.base import NerSpan
 from hushmark_core.ner.decode import decode_predictions
+from hushmark_core.ner.integrity import verify_runtime_artifacts
 from hushmark_core.ner.registry_types import ModelSpecLike
 
 
@@ -66,6 +67,7 @@ class OnnxNerBackend:
             digest = file_digest(model_stream, "sha256").hexdigest()
         if digest != self._spec.onnx_sha256:
             raise OnnxUnsupported(f"ONNX SHA-256 verification failed: {model_file}")
+        verify_runtime_artifacts(self._model_dir, self._spec)
         gliner_module = importlib.import_module("gliner")
         gliner_class = gliner_module.GLiNER
         model = gliner_class.from_pretrained(

@@ -5,17 +5,26 @@ from __future__ import annotations
 import re
 
 from hushmark_core.recognizers.base import DetectorHit, ValidatorRecognizer
+from hushmark_core.recognizers.digits import ascii_digit
 
 CARD_PATTERN = re.compile(r"(?<!\d)(?:\d[ -]?){12,18}\d(?!\d)")
 
 
-def compact_card(value: str) -> str:
-    return value.replace(" ", "").replace("-", "")
+def compact_card(value: str) -> str | None:
+    digits: list[str] = []
+    for char in value:
+        if char in {" ", "-"}:
+            continue
+        digit = ascii_digit(char)
+        if digit is None:
+            return None
+        digits.append(digit)
+    return "".join(digits)
 
 
 def validate_credit_card(value: str) -> bool:
     compact = compact_card(value)
-    if not 13 <= len(compact) <= 19 or not compact.isascii() or not compact.isdigit():
+    if compact is None or not 13 <= len(compact) <= 19:
         return False
     total = 0
     parity = len(compact) % 2

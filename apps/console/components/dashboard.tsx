@@ -47,12 +47,12 @@ export function Dashboard() {
             {entries.map(([type, count]) => (
               <div className="bar-row" key={type}>
                 <span className="matrix-code">{type}</span>
-                <span className="bar-track">
-                  <span
-                    className="bar-fill"
-                    style={{ width: `${String(Math.max(4, (count / max) * 100))}%` }}
-                  />
-                </span>
+                <progress
+                  aria-label={`${type}: ${String(count)}`}
+                  className="bar-track"
+                  max={max}
+                  value={count}
+                />
                 <strong>{count}</strong>
               </div>
             ))}

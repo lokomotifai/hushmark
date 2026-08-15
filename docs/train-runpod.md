@@ -22,7 +22,7 @@ From the repository root:
 
 ```bash
 UV_CACHE_DIR=/tmp/hushmark-uv-cache uv run python scripts/build-training-bundle.py
-shasum -a 256 dist/hushmark-ac1-training-0.1.0.tar.gz
+shasum -a 256 dist/hushmark-ac1-training-0.1.1.tar.gz
 ```
 
 The archive is generated from an explicit allowlist. It contains source, the locked public
@@ -33,7 +33,7 @@ Use the full SSH command shown by RunPod's **Connect** panel to transfer the arc
 required for SCP; replace the example host and port with the panel's values:
 
 ```bash
-scp -P RUNPOD_SSH_PORT dist/hushmark-ac1-training-0.1.0.tar.gz \
+scp -P RUNPOD_SSH_PORT dist/hushmark-ac1-training-0.1.1.tar.gz \
   root@RUNPOD_PUBLIC_IP:/workspace/
 ```
 
@@ -43,8 +43,8 @@ In the Pod terminal:
 
 ```bash
 cd /workspace
-tar -xzf hushmark-ac1-training-0.1.0.tar.gz
-cd hushmark-ac1-training-0.1.0
+tar -xzf hushmark-ac1-training-0.1.1.tar.gz
+cd hushmark-ac1-training-0.1.1
 python3 scripts/verify-training-bundle.py
 ```
 

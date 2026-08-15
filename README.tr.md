@@ -83,14 +83,14 @@ rehberini kullanın.
 
 ## Yayımlanan çıktılar
 
-| Çıktı          | Paket / imaj                                                                               |
-| -------------- | ------------------------------------------------------------------------------------------ |
-| Core           | [`hushmark-core`](https://pypi.org/project/hushmark-core/) · `ghcr.io/hushmark/core:0.1.0` |
-| Gateway        | `ghcr.io/hushmark/gateway:0.1.0`                                                           |
-| Konsol         | `ghcr.io/hushmark/console:0.1.0`                                                           |
-| Python SDK     | [`hushmark-sdk`](https://pypi.org/project/hushmark-sdk/)                                   |
-| TypeScript SDK | [`@hushmark/ai-sdk`](https://www.npmjs.com/package/@hushmark/ai-sdk)                       |
-| Ortak şemalar  | [`@hushmark/shared`](https://www.npmjs.com/package/@hushmark/shared)                       |
+| Çıktı          | Paket / imaj                                                                                  |
+| -------------- | --------------------------------------------------------------------------------------------- |
+| Core           | [`hushmark-core`](https://pypi.org/project/hushmark-core/) · `ghcr.io/lokomotifai/core:0.1.1` |
+| Gateway        | `ghcr.io/lokomotifai/gateway:0.1.1`                                                           |
+| Konsol         | `ghcr.io/lokomotifai/console:0.1.1`                                                           |
+| Python SDK     | [`hushmark-sdk`](https://pypi.org/project/hushmark-sdk/)                                      |
+| TypeScript SDK | [`@hushmark/ai-sdk`](https://www.npmjs.com/package/@hushmark/ai-sdk)                          |
+| Ortak şemalar  | [`@hushmark/shared`](https://www.npmjs.com/package/@hushmark/shared)                          |
 
 Sürüm iş akışları kaynak kanıtı ve SBOM üretir. İmaj imzalarını ve tasdiklerini
 [güvenlik modelinde](docs/security.md) anlatıldığı gibi doğrulayın; hareketli etiketi sürüm kimliği

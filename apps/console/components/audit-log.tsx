@@ -4,7 +4,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { useCallback, useEffect, useState } from "react";
 
 import { PageHead } from "@/components/page-head";
-import { adminJson, type AuditPage } from "@/lib/admin";
+import { adminDownload, adminJson, type AuditPage } from "@/lib/admin";
 
 interface VerifyResult {
   ok: boolean;
@@ -30,6 +30,15 @@ export function AuditLog() {
     setPending(true);
     try {
       setVerification(await adminJson<VerifyResult>("audit/verify?from=1&to=latest"));
+    } finally {
+      setPending(false);
+    }
+  }
+
+  async function exportAudit() {
+    setPending(true);
+    try {
+      await adminDownload("audit/export?from=1&to=latest", "hushmark-audit.ndjson");
     } finally {
       setPending(false);
     }
@@ -62,9 +71,14 @@ export function AuditLog() {
               </span>
             ) : null}
           </div>
-          <a className="secondary-button" href="/api/admin/audit/export?from=1&to=latest">
+          <button
+            className="secondary-button"
+            disabled={pending}
+            type="button"
+            onClick={() => void exportAudit()}
+          >
             {t("export")}
-          </a>
+          </button>
         </div>
         <div className="table-wrap">
           {result === null ? <p className="notice">{common("loading")}</p> : null}

@@ -83,14 +83,14 @@ use the [air-gap guide](docs/install-airgap.md).
 
 ## Published artifacts
 
-| Artifact       | Package / image                                                                            |
-| -------------- | ------------------------------------------------------------------------------------------ |
-| Core           | [`hushmark-core`](https://pypi.org/project/hushmark-core/) · `ghcr.io/hushmark/core:0.1.0` |
-| Gateway        | `ghcr.io/hushmark/gateway:0.1.0`                                                           |
-| Console        | `ghcr.io/hushmark/console:0.1.0`                                                           |
-| Python SDK     | [`hushmark-sdk`](https://pypi.org/project/hushmark-sdk/)                                   |
-| TypeScript SDK | [`@hushmark/ai-sdk`](https://www.npmjs.com/package/@hushmark/ai-sdk)                       |
-| Shared schemas | [`@hushmark/shared`](https://www.npmjs.com/package/@hushmark/shared)                       |
+| Artifact       | Package / image                                                                               |
+| -------------- | --------------------------------------------------------------------------------------------- |
+| Core           | [`hushmark-core`](https://pypi.org/project/hushmark-core/) · `ghcr.io/lokomotifai/core:0.1.1` |
+| Gateway        | `ghcr.io/lokomotifai/gateway:0.1.1`                                                           |
+| Console        | `ghcr.io/lokomotifai/console:0.1.1`                                                           |
+| Python SDK     | [`hushmark-sdk`](https://pypi.org/project/hushmark-sdk/)                                      |
+| TypeScript SDK | [`@hushmark/ai-sdk`](https://www.npmjs.com/package/@hushmark/ai-sdk)                          |
+| Shared schemas | [`@hushmark/shared`](https://www.npmjs.com/package/@hushmark/shared)                          |
 
 Release workflows produce provenance and SBOM evidence. Verify image signatures and attestations as
 described in the [security model](docs/security.md); do not treat a floating tag as release identity.

@@ -12,7 +12,7 @@ import yaml
 ROOT = Path(__file__).resolve().parents[1]
 DOCKER_DIR = ROOT / "deploy" / "docker"
 CHART_DIR = ROOT / "deploy" / "helm" / "hushmark"
-RELEASE_VERSION = "0.1.0"
+RELEASE_VERSION = "0.1.1"
 
 
 def check_versions() -> None:
@@ -65,9 +65,12 @@ def check_compose() -> None:
     compose = yaml.safe_load((DOCKER_DIR / "compose.yaml").read_text(encoding="utf-8"))
     services = compose["services"]
     assert {"core", "gateway", "console", "postgres", "vault", "fake-upstream"} <= set(services)
-    for name in ("core", "gateway", "console", "fake-upstream"):
+    for name in ("core", "gateway", "console", "fake-upstream", "postgres", "vault"):
         assert services[name]["read_only"] is True
         assert "no-new-privileges:true" in services[name]["security_opt"]
+        assert services[name]["cap_drop"] == ["ALL"]
+        assert services[name]["networks"] == ["evaluation"]
+    assert compose["networks"]["evaluation"]["internal"] is True
     assert services["gateway"]["ports"] == ["127.0.0.1:8080:8080"]
     assert services["console"]["ports"] == ["127.0.0.1:3000:3000"]
 
@@ -112,7 +115,7 @@ def check_production_compose() -> None:
     assert "HUSHMARK_API_KEYS" not in gateway_environment
     assert "HUSHMARK_OPENAI_API_KEY" not in gateway_environment
     assert "HUSHMARK_ANTHROPIC_API_KEY" not in gateway_environment
-    assert gateway_environment["HUSHMARK_TRUST_PROXY"] == "${HUSHMARK_TRUST_PROXY:-true}"
+    assert gateway_environment["HUSHMARK_TRUST_PROXY_HOPS"] == ("${HUSHMARK_TRUST_PROXY_HOPS:-1}")
     assert gateway_environment["HUSHMARK_BODY_LIMIT_BYTES"] == (
         "${HUSHMARK_BODY_LIMIT_BYTES:-1048576}"
     )
@@ -150,8 +153,9 @@ def check_chart() -> None:
     values = yaml.safe_load((CHART_DIR / "values.yaml").read_text(encoding="utf-8"))
     shared_values = yaml.safe_load((CHART_DIR / "values.shared.yaml").read_text(encoding="utf-8"))
     schema = json.loads((CHART_DIR / "values.schema.json").read_text(encoding="utf-8"))
-    assert chart["version"] == chart["appVersion"] == "0.1.0"
+    assert chart["version"] == chart["appVersion"] == "0.1.1"
     assert values["networkPolicy"]["enabled"] is True
+    assert values["networkPolicy"]["externalEgressCidrs"] == []
     assert values["core"]["model"]["baked"] is True
     assert values["postgres"]["enabled"] is False
     assert shared_values["fullnameOverride"] == "hushmark"
@@ -182,12 +186,21 @@ def check_chart() -> None:
     source = (ROOT / "packages/gateway-enterprise/drizzle/0000_initial.sql").read_bytes()
     packaged = (CHART_DIR / "files/0000_initial.sql").read_bytes()
     assert source == packaged, "Helm PostgreSQL migration drifted from gateway-enterprise"
-    assert (ROOT / "packages/gateway-enterprise/drizzle/0001_security_hardening.sql").is_file()
+    for migration in (
+        "0001_security_hardening.sql",
+        "0002_vault_session_keys.sql",
+        "0003_vault_placeholder_counters.sql",
+    ):
+        assert (ROOT / "packages/gateway-enterprise/drizzle" / migration).is_file()
     rendered_sources = "\n".join(
         path.read_text(encoding="utf-8") for path in (CHART_DIR / "templates").glob("*.yaml")
     )
     assert "readOnlyRootFilesystem: true" in rendered_sources
     assert "runAsNonRoot: true" in rendered_sources
+    assert "policyTypes: [Ingress, Egress]" in rendered_sources
+    assert "podSelector: {}" in rendered_sources
+    installer = (ROOT / "deploy/airgap/install.sh").read_text(encoding="utf-8")
+    assert '--from-literal=core-service-token="$(openssl rand -hex 32)"' in installer
 
 
 def main() -> None:

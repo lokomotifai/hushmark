@@ -17,7 +17,7 @@ Admin routes use the local session cookie and RBAC. Error bodies use `error.code
 | POST   | `/admin/api-keys`        | Create an API key.                                        |
 | DELETE | `/admin/api-keys/:id`    | Revoke an API key.                                        |
 | GET    | `/admin/audit/events`    | Page through no-value audit events.                       |
-| GET    | `/admin/audit/export`    | Export audit NDJSON.                                      |
+| POST   | `/admin/audit/export`    | Export audit NDJSON.                                      |
 | GET    | `/admin/audit/verify`    | Verify the current audit chain.                           |
 | POST   | `/admin/auth/login`      | Create a local admin session.                             |
 | POST   | `/admin/auth/logout`     | Destroy the current admin session.                        |
@@ -28,7 +28,7 @@ Admin routes use the local session cookie and RBAC. Error bodies use `error.code
 | DELETE | `/admin/policies/:id`    | Delete a policy.                                          |
 | GET    | `/admin/providers`       | List provider configuration metadata.                     |
 | POST   | `/admin/providers`       | Update provider configuration metadata.                   |
-| GET    | `/admin/reports/tedbir`  | Generate an entitled Tedbir PDF.                          |
+| POST   | `/admin/reports/tedbir`  | Generate an entitled Tedbir PDF.                          |
 | POST   | `/admin/vault/resolve`   | Role-gated placeholder resolution.                        |
 | GET    | `/healthz`               | Process liveness; no authentication.                      |
 | GET    | `/readyz`                | Readiness, including the gateway's transitive core check. |

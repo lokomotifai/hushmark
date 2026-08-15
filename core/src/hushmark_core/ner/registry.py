@@ -26,6 +26,7 @@ class ModelSpec:
     onnx_file: str
     onnx_size: int
     onnx_sha256: str
+    runtime_files: tuple[tuple[str, int, str], ...]
 
 
 def load_model_spec(registry_path: Path, model_id: str) -> ModelSpec:
@@ -33,6 +34,11 @@ def load_model_spec(registry_path: Path, model_id: str) -> ModelSpec:
     models = raw.get("models") if isinstance(raw, dict) else None
     if not isinstance(models, list):
         raise ValueError("model registry must contain a models list")
+    models_by_id = {
+        str(model["id"]): model
+        for model in models
+        if isinstance(model, dict) and isinstance(model.get("id"), str)
+    }
     for model in models:
         if not isinstance(model, dict) or model.get("id") != model_id:
             continue
@@ -76,6 +82,42 @@ def load_model_spec(registry_path: Path, model_id: str) -> ModelSpec:
             or len(onnx_sha256) != 64
         ):
             raise ValueError(f"model {model_id} has an invalid pinned ONNX export")
+        runtime_config = model.get("runtime_config")
+        if not isinstance(runtime_config, dict):
+            raise ValueError(f"model {model_id} has no runtime config declaration")
+        source_name = runtime_config.get("source")
+        target_name = runtime_config.get("target")
+        tokenizer_model_id = runtime_config.get("tokenizer_model")
+        if not all(
+            isinstance(value, str) for value in (source_name, target_name, tokenizer_model_id)
+        ):
+            raise ValueError(f"model {model_id} has an invalid runtime config declaration")
+        source_spec = next(
+            (file for file in files if isinstance(file, dict) and file.get("path") == source_name),
+            None,
+        )
+        tokenizer_model = models_by_id.get(str(tokenizer_model_id))
+        tokenizer_files = (
+            tokenizer_model.get("files") if isinstance(tokenizer_model, dict) else None
+        )
+        if not isinstance(source_spec, dict) or not isinstance(tokenizer_files, list):
+            raise ValueError(f"model {model_id} has unpinned runtime dependencies")
+        runtime_specs: list[tuple[str, int, str]] = [
+            pinned_file(source_spec, str(target_name), model_id)
+        ]
+        if tokenizer_model_id == model_id:
+            runtime_specs.extend(
+                pinned_file(file, str(file["path"]), model_id)
+                for file in files
+                if isinstance(file, dict)
+                and file.get("path") not in {source_name, "pytorch_model.bin"}
+            )
+        else:
+            runtime_specs.extend(
+                pinned_file(file, str(file["path"]), model_id)
+                for file in tokenizer_files
+                if isinstance(file, dict)
+            )
         return ModelSpec(
             id=model_id,
             source=str(model["source"]),
@@ -88,8 +130,17 @@ def load_model_spec(registry_path: Path, model_id: str) -> ModelSpec:
             onnx_file=onnx_file,
             onnx_size=onnx_size,
             onnx_sha256=onnx_sha256,
+            runtime_files=tuple(runtime_specs),
         )
     raise ValueError(f"unknown model id: {model_id}")
+
+
+def pinned_file(file: dict[str, Any], runtime_name: str, model_id: str) -> tuple[str, int, str]:
+    size = file.get("size")
+    sha256 = file.get("sha256")
+    if not isinstance(size, int) or size <= 0 or not isinstance(sha256, str) or len(sha256) != 64:
+        raise ValueError(f"model {model_id} has an unpinned runtime artifact")
+    return runtime_name, size, sha256
 
 
 def create_backend(

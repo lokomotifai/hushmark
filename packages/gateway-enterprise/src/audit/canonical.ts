@@ -18,10 +18,8 @@ export function sha256(value: string | Uint8Array): string {
 
 export function auditHash(
   eventWithoutHash: Omit<AuditRecord, "hash">,
-  integrityKey?: string | Uint8Array,
+  integrityKey: string | Uint8Array,
 ): string {
   const canonical = jcs(eventWithoutHash) + eventWithoutHash.prev_hash;
-  return integrityKey === undefined
-    ? sha256(canonical)
-    : createHmac("sha256", integrityKey).update(canonical).digest("hex");
+  return createHmac("sha256", integrityKey).update(canonical).digest("hex");
 }
