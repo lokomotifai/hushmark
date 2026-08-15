@@ -221,17 +221,19 @@ export function verifySecret(hash: string, secret: string): Promise<boolean> {
 export async function issueApiKey(
   name: string,
   now = new Date(),
+  id = randomUUID(),
 ): Promise<{
   secret: string;
   summary: ApiKeySummary;
   secretHash: string;
 }> {
   const validatedName = z.string().min(1).max(120).parse(name);
+  const validatedId = z.uuid().parse(id);
   const secret = `hm_k1_${randomBytes(32).toString("base64url")}`;
   return {
     secret,
     summary: {
-      id: randomUUID(),
+      id: validatedId,
       name: validatedName,
       prefix: secret.slice(0, 18),
       revokedAt: null,
