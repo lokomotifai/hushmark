@@ -21,6 +21,7 @@
     "test:e2e": "vitest run test/e2e test/invariants"
   },
   "dependencies": {
+    "@fastify/rate-limit": "11.2.0",
     "@hushmark/shared": "workspace:*",
     "fastify": "^5.8.0",
     "undici": "^7.16.0",
