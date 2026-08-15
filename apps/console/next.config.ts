@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 import createNextIntlPlugin from "next-intl/plugin";
+import path from "node:path";
 
 const scriptSource =
   process.env.NODE_ENV === "development"
@@ -8,6 +9,11 @@ const scriptSource =
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  outputFileTracingRoot: path.join(import.meta.dirname, "../.."),
+  // Node 22 resolves @swc/helpers via module-sync; include ESM files missed by standalone tracing.
+  outputFileTracingIncludes: {
+    "/*": ["../../node_modules/.pnpm/@swc+helpers@*/node_modules/@swc/helpers/esm/**/*"],
+  },
   poweredByHeader: false,
   headers() {
     return Promise.resolve([
