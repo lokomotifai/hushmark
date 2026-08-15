@@ -88,7 +88,12 @@ jobs:
         with:
           version: v4.2.0
       - run: uv sync --frozen
-      - run: helm plugin install https://github.com/helm-unittest/helm-unittest --version 9cf59a78dbb89f3e3c70c62d2570cd7e96b97845
+      - name: Install commit-pinned Helm unittest plugin
+        run: |
+          # Helm 4 cannot provenance-verify Git plugin sources; the full commit SHA is the integrity boundary.
+          helm plugin install https://github.com/helm-unittest/helm-unittest \
+            --version 9cf59a78dbb89f3e3c70c62d2570cd7e96b97845 \
+            --verify=false
       - run: ./scripts/check-packaging.sh
       - run: helm unittest deploy/helm/hushmark
 
