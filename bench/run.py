@@ -14,7 +14,11 @@ ROOT = Path(__file__).resolve().parent
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--engine", choices=("core", "presidio-default"), required=True)
+    parser.add_argument(
+        "--engine",
+        choices=("core", "presidio-default", "presidio-tr", "gliner-raw", "openai-llm"),
+        required=True,
+    )
     parser.add_argument("--backend", choices=("disabled", "torch", "onnx"), default="onnx")
     parser.add_argument("--report", type=Path, required=True)
     parser.add_argument("--limit", type=int)

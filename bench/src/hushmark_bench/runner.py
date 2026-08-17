@@ -10,12 +10,14 @@ from typing import Any, Literal, Protocol
 from hushmark_bench.dataset import deterministic_types, load_dataset
 from hushmark_bench.metrics import evaluate
 from hushmark_bench.report import render_report, write_result
+from hushmark_bench.slices import build_slices
 
 
 class Adapter(Protocol):
     name: str
     model_id: str
     model_sha256: str | None
+    runtime: str
 
     def predict(self, text: str) -> list[dict[str, object]]: ...
 
@@ -39,6 +41,18 @@ def build_adapter(engine: str, backend: Literal["disabled", "torch", "onnx"]) ->
         from hushmark_bench.adapters.presidio_default import PresidioDefaultAdapter
 
         return PresidioDefaultAdapter()
+    if engine == "presidio-tr":
+        from hushmark_bench.adapters.presidio_tr import PresidioTurkishAdapter
+
+        return PresidioTurkishAdapter()
+    if engine == "gliner-raw":
+        from hushmark_bench.adapters.gliner_raw import GlinerRawAdapter
+
+        return GlinerRawAdapter()
+    if engine == "openai-llm":
+        from hushmark_bench.adapters.openai_llm import OpenAiLlmAdapter
+
+        return OpenAiLlmAdapter()
     raise ValueError(f"unsupported engine: {engine}")
 
 
@@ -69,9 +83,12 @@ def run_benchmark(
         examples = examples[:limit]
     adapter = build_adapter(engine, backend)
     predictions: list[list[dict[str, object]]] = []
+    durations: list[float] = []
     started = time.perf_counter()
     for index, example in enumerate(examples, start=1):
+        call_started = time.perf_counter()
         predictions.append(adapter.predict(example["text"]))
+        durations.append(time.perf_counter() - call_started)
         if index % 100 == 0:
             print(f"evaluated {index}/{len(examples)}", flush=True)
     duration = time.perf_counter() - started
@@ -83,7 +100,7 @@ def run_benchmark(
     result: dict[str, Any] = {
         "schema_version": 1,
         "engine": adapter.name,
-        "backend": backend if engine == "core" else "builtins",
+        "backend": adapter.runtime,
         "model_id": adapter.model_id,
         "model_sha256": adapter.model_sha256,
         "dataset": {
@@ -94,6 +111,7 @@ def run_benchmark(
         "duration_seconds": duration,
         "strict": strict,
         "partial": partial,
+        "slices": build_slices(examples, gold, predictions, strict, partial, durations),
     }
     write_result(report_path, result)
     render_report(report_path)

@@ -89,7 +89,7 @@ def main() -> int:
         if runtime_config is not None:
             source_config = target_dir / runtime_config["source"]
             target_config = target_dir / runtime_config["target"]
-            config = json.loads(source_config.read_text(encoding="utf-8"))
+            json.loads(source_config.read_text(encoding="utf-8"))
             tokenizer_model = models_by_id[runtime_config["tokenizer_model"]]
             tokenizer_dir = MODEL_ROOT / tokenizer_model["id"]
             if tokenizer_dir != target_dir:
@@ -99,10 +99,9 @@ def main() -> int:
                     if not validate_file(source, file_spec):
                         raise ValueError(f"tokenizer dependency failed verification: {source}")
                     shutil.copyfile(source, destination)
-            target_config.write_text(
-                json.dumps(config, ensure_ascii=False, indent=2) + "\n",
-                encoding="utf-8",
-            )
+            # The runtime integrity check compares the materialized target against the
+            # pinned source bytes, so this copy must not reformat the JSON.
+            shutil.copyfile(source_config, target_config)
             print(f"materialized offline model config: {target_config.relative_to(ROOT)}")
     return 0
 

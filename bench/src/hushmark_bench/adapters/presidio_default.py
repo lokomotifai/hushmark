@@ -26,6 +26,7 @@ class PresidioDefaultAdapter:
     name = "presidio-default"
     model_id = "presidio-builtins-en"
     model_sha256: str | None = None
+    runtime = "builtins"
 
     def __init__(self) -> None:
         tldextract_runtime = importlib.import_module("tldextract.tldextract")
