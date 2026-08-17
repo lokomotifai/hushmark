@@ -9,11 +9,12 @@ from hushmark_core.config import Settings
 from hushmark_core.engine import DetectionEngine
 from hushmark_core.ner.registry import create_backend
 
+from hushmark_bench.adapters import engine_slug
+
 
 class CoreAdapter:
-    name = "core"
-
     def __init__(self, backend: Literal["disabled", "torch", "onnx"] = "onnx") -> None:
+        self.runtime: str = backend
         settings = Settings(ner_backend=backend)
         ner_backend = create_backend(
             backend=backend,
@@ -28,6 +29,7 @@ class CoreAdapter:
             settings.ner_thresholds,
         )
         self.model_id = self._engine.model_id
+        self.name = engine_slug("core", self.model_id, backend)
         self.model_sha256 = self._engine.model_sha256
 
     def predict(self, text: str) -> list[dict[str, object]]:

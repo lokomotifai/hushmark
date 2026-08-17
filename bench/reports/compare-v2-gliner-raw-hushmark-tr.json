@@ -1,0 +1,577 @@
+{
+  "backend": "torch",
+  "dataset": {
+    "examples": 2016,
+    "name": "hushmark-bench-v0.jsonl",
+    "sha256": "6170b620faa349dbcbf2f2a973d5de20e35c6594e5626a2a589d20df5f67d642"
+  },
+  "duration_seconds": 100.42373345799979,
+  "engine": "gliner-raw-hushmark-tr",
+  "model_id": "hushmark-tr",
+  "model_sha256": null,
+  "partial": {
+    "macro": {
+      "f1": 0.6702955632576478,
+      "precision": 0.7513101602882096,
+      "recall": 0.6691695601851851
+    },
+    "micro": {
+      "f1": 0.7575583400390848,
+      "false_negative": 1937,
+      "false_positive": 172,
+      "precision": 0.9503893856359965,
+      "recall": 0.6297782874617737,
+      "support": 5232,
+      "true_positive": 3295
+    },
+    "mode": "partial",
+    "per_type": {
+      "ADDRESS": {
+        "f1": 0.9965156794425087,
+        "false_negative": 2,
+        "false_positive": 0,
+        "precision": 1.0,
+        "recall": 0.9930555555555556,
+        "support": 288,
+        "true_positive": 286
+      },
+      "BIOMETRIC_REF": {
+        "f1": 1.0,
+        "false_negative": 0,
+        "false_positive": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "support": 96,
+        "true_positive": 96
+      },
+      "CREDIT_CARD": {
+        "f1": 0.13953488372093023,
+        "false_negative": 222,
+        "false_positive": 0,
+        "precision": 1.0,
+        "recall": 0.075,
+        "support": 240,
+        "true_positive": 18
+      },
+      "CRIMINAL": {
+        "f1": 0.9787234042553191,
+        "false_negative": 4,
+        "false_positive": 0,
+        "precision": 1.0,
+        "recall": 0.9583333333333334,
+        "support": 96,
+        "true_positive": 92
+      },
+      "DOB": {
+        "f1": 1.0,
+        "false_negative": 0,
+        "false_positive": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "support": 288,
+        "true_positive": 288
+      },
+      "EMAIL": {
+        "f1": 0.7891891891891891,
+        "false_negative": 117,
+        "false_positive": 0,
+        "precision": 1.0,
+        "recall": 0.6517857142857143,
+        "support": 336,
+        "true_positive": 219
+      },
+      "ETHNICITY": {
+        "f1": 1.0,
+        "false_negative": 0,
+        "false_positive": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "support": 96,
+        "true_positive": 96
+      },
+      "HEALTH": {
+        "f1": 1.0,
+        "false_negative": 0,
+        "false_positive": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "support": 240,
+        "true_positive": 240
+      },
+      "IBAN_OTHER": {
+        "f1": 0.0,
+        "false_negative": 192,
+        "false_positive": 0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "support": 192,
+        "true_positive": 0
+      },
+      "ORG": {
+        "f1": 0.9622166246851386,
+        "false_negative": 1,
+        "false_positive": 14,
+        "precision": 0.9317073170731708,
+        "recall": 0.9947916666666666,
+        "support": 192,
+        "true_positive": 191
+      },
+      "PERSON": {
+        "f1": 0.9043698543381887,
+        "false_negative": 150,
+        "false_positive": 1,
+        "precision": 0.9986013986013986,
+        "recall": 0.8263888888888888,
+        "support": 864,
+        "true_positive": 714
+      },
+      "POLITICAL": {
+        "f1": 0.9947643979057591,
+        "false_negative": 1,
+        "false_positive": 0,
+        "precision": 1.0,
+        "recall": 0.9895833333333334,
+        "support": 96,
+        "true_positive": 95
+      },
+      "RELIGION": {
+        "f1": 1.0,
+        "false_negative": 0,
+        "false_positive": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "support": 96,
+        "true_positive": 96
+      },
+      "SECRET_API_KEY": {
+        "f1": 0.8,
+        "false_negative": 32,
+        "false_positive": 0,
+        "precision": 1.0,
+        "recall": 0.6666666666666666,
+        "support": 96,
+        "true_positive": 64
+      },
+      "SECRET_JWT": {
+        "f1": 0.0,
+        "false_negative": 96,
+        "false_positive": 0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "support": 96,
+        "true_positive": 0
+      },
+      "SECRET_PRIVATE_KEY": {
+        "f1": 0.48484848484848486,
+        "false_negative": 0,
+        "false_positive": 102,
+        "precision": 0.32,
+        "recall": 1.0,
+        "support": 48,
+        "true_positive": 48
+      },
+      "SEXUAL_LIFE": {
+        "f1": 0.9732620320855615,
+        "false_negative": 5,
+        "false_positive": 0,
+        "precision": 1.0,
+        "recall": 0.9479166666666666,
+        "support": 96,
+        "true_positive": 91
+      },
+      "TR_IBAN": {
+        "f1": 0.22627737226277372,
+        "false_negative": 209,
+        "false_positive": 3,
+        "precision": 0.9117647058823529,
+        "recall": 0.12916666666666668,
+        "support": 240,
+        "true_positive": 31
+      },
+      "TR_PHONE": {
+        "f1": 0.9303621169916435,
+        "false_negative": 2,
+        "false_positive": 48,
+        "precision": 0.8743455497382199,
+        "recall": 0.9940476190476191,
+        "support": 336,
+        "true_positive": 334
+      },
+      "TR_PLATE": {
+        "f1": 0.9070294784580498,
+        "false_negative": 40,
+        "false_positive": 1,
+        "precision": 0.9950248756218906,
+        "recall": 0.8333333333333334,
+        "support": 240,
+        "true_positive": 200
+      },
+      "TR_SGK": {
+        "f1": 0.0,
+        "false_negative": 240,
+        "false_positive": 2,
+        "precision": 0.0,
+        "recall": 0.0,
+        "support": 240,
+        "true_positive": 0
+      },
+      "TR_TCKN": {
+        "f1": 0.0,
+        "false_negative": 432,
+        "false_positive": 1,
+        "precision": 0.0,
+        "recall": 0.0,
+        "support": 432,
+        "true_positive": 0
+      },
+      "TR_VKN": {
+        "f1": 0.0,
+        "false_negative": 192,
+        "false_positive": 0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "support": 192,
+        "true_positive": 0
+      },
+      "UNION": {
+        "f1": 1.0,
+        "false_negative": 0,
+        "false_positive": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "support": 96,
+        "true_positive": 96
+      }
+    }
+  },
+  "schema_version": 1,
+  "slices": {
+    "coverage": {
+      "detected": [
+        "ADDRESS",
+        "BIOMETRIC_REF",
+        "CREDIT_CARD",
+        "CRIMINAL",
+        "DOB",
+        "EMAIL",
+        "ETHNICITY",
+        "HEALTH",
+        "ORG",
+        "PERSON",
+        "POLITICAL",
+        "RELIGION",
+        "SECRET_API_KEY",
+        "SECRET_PRIVATE_KEY",
+        "SEXUAL_LIFE",
+        "TR_IBAN",
+        "TR_PHONE",
+        "TR_PLATE",
+        "UNION"
+      ],
+      "missed": ["IBAN_OTHER", "SECRET_JWT", "TR_SGK", "TR_TCKN", "TR_VKN"],
+      "types_detected": 19,
+      "types_with_gold": 24
+    },
+    "identifier": {
+      "f1": 0.4602287842511306,
+      "false_negative": 1823,
+      "false_positive": 206,
+      "precision": 0.80765639589169,
+      "recall": 0.32180059523809523,
+      "support": 2688,
+      "true_positive": 865
+    },
+    "latency": {
+      "mean_ms": 49.8112849424587,
+      "p50_ms": 48.895416999584995,
+      "p95_ms": 57.88041699997848,
+      "p99_ms": 65.03020800028025
+    },
+    "morphology": {
+      "lowercase_context": {
+        "examples": 504,
+        "f1": 0.7513711151736746,
+        "false_negative": 486,
+        "false_positive": 58,
+        "precision": 0.9340909090909091,
+        "recall": 0.6284403669724771,
+        "support": 1308,
+        "true_positive": 822
+      },
+      "missing_diacritics": {
+        "examples": 504,
+        "f1": 0.7245703669298653,
+        "false_negative": 528,
+        "false_positive": 65,
+        "precision": 0.9230769230769231,
+        "recall": 0.5963302752293578,
+        "support": 1308,
+        "true_positive": 780
+      },
+      "name_suffix": {
+        "examples": 504,
+        "f1": 0.7503435639028859,
+        "false_negative": 489,
+        "false_positive": 56,
+        "precision": 0.936,
+        "recall": 0.6261467889908257,
+        "support": 1308,
+        "true_positive": 819
+      },
+      "plain": {
+        "examples": 504,
+        "f1": 0.7420689655172414,
+        "false_negative": 501,
+        "false_positive": 60,
+        "precision": 0.9307958477508651,
+        "recall": 0.6169724770642202,
+        "support": 1308,
+        "true_positive": 807
+      }
+    },
+    "special_category": {
+      "f1": 0.9944873208379272,
+      "false_negative": 10,
+      "false_positive": 0,
+      "precision": 1.0,
+      "recall": 0.9890350877192983,
+      "support": 912,
+      "true_positive": 902
+    }
+  },
+  "strict": {
+    "macro": {
+      "f1": 0.6482060033664222,
+      "precision": 0.7360234103718639,
+      "recall": 0.6256655092592592
+    },
+    "micro": {
+      "f1": 0.7421542706058167,
+      "false_negative": 2004,
+      "false_positive": 239,
+      "precision": 0.9310643207383905,
+      "recall": 0.6169724770642202,
+      "support": 5232,
+      "true_positive": 3228
+    },
+    "mode": "strict",
+    "per_type": {
+      "ADDRESS": {
+        "f1": 0.9860627177700347,
+        "false_negative": 5,
+        "false_positive": 3,
+        "precision": 0.9895104895104895,
+        "recall": 0.9826388888888888,
+        "support": 288,
+        "true_positive": 283
+      },
+      "BIOMETRIC_REF": {
+        "f1": 1.0,
+        "false_negative": 0,
+        "false_positive": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "support": 96,
+        "true_positive": 96
+      },
+      "CREDIT_CARD": {
+        "f1": 0.13953488372093023,
+        "false_negative": 222,
+        "false_positive": 0,
+        "precision": 1.0,
+        "recall": 0.075,
+        "support": 240,
+        "true_positive": 18
+      },
+      "CRIMINAL": {
+        "f1": 0.9787234042553191,
+        "false_negative": 4,
+        "false_positive": 0,
+        "precision": 1.0,
+        "recall": 0.9583333333333334,
+        "support": 96,
+        "true_positive": 92
+      },
+      "DOB": {
+        "f1": 1.0,
+        "false_negative": 0,
+        "false_positive": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "support": 288,
+        "true_positive": 288
+      },
+      "EMAIL": {
+        "f1": 0.7891891891891891,
+        "false_negative": 117,
+        "false_positive": 0,
+        "precision": 1.0,
+        "recall": 0.6517857142857143,
+        "support": 336,
+        "true_positive": 219
+      },
+      "ETHNICITY": {
+        "f1": 1.0,
+        "false_negative": 0,
+        "false_positive": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "support": 96,
+        "true_positive": 96
+      },
+      "HEALTH": {
+        "f1": 1.0,
+        "false_negative": 0,
+        "false_positive": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "support": 240,
+        "true_positive": 240
+      },
+      "IBAN_OTHER": {
+        "f1": 0.0,
+        "false_negative": 192,
+        "false_positive": 0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "support": 192,
+        "true_positive": 0
+      },
+      "ORG": {
+        "f1": 0.947103274559194,
+        "false_negative": 4,
+        "false_positive": 17,
+        "precision": 0.9170731707317074,
+        "recall": 0.9791666666666666,
+        "support": 192,
+        "true_positive": 188
+      },
+      "PERSON": {
+        "f1": 0.889170360987967,
+        "false_negative": 162,
+        "false_positive": 13,
+        "precision": 0.9818181818181818,
+        "recall": 0.8125,
+        "support": 864,
+        "true_positive": 702
+      },
+      "POLITICAL": {
+        "f1": 0.9947643979057591,
+        "false_negative": 1,
+        "false_positive": 0,
+        "precision": 1.0,
+        "recall": 0.9895833333333334,
+        "support": 96,
+        "true_positive": 95
+      },
+      "RELIGION": {
+        "f1": 1.0,
+        "false_negative": 0,
+        "false_positive": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "support": 96,
+        "true_positive": 96
+      },
+      "SECRET_API_KEY": {
+        "f1": 0.8,
+        "false_negative": 32,
+        "false_positive": 0,
+        "precision": 1.0,
+        "recall": 0.6666666666666666,
+        "support": 96,
+        "true_positive": 64
+      },
+      "SECRET_JWT": {
+        "f1": 0.0,
+        "false_negative": 96,
+        "false_positive": 0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "support": 96,
+        "true_positive": 0
+      },
+      "SECRET_PRIVATE_KEY": {
+        "f1": 0.0,
+        "false_negative": 48,
+        "false_positive": 150,
+        "precision": 0.0,
+        "recall": 0.0,
+        "support": 48,
+        "true_positive": 0
+      },
+      "SEXUAL_LIFE": {
+        "f1": 0.9732620320855615,
+        "false_negative": 5,
+        "false_positive": 0,
+        "precision": 1.0,
+        "recall": 0.9479166666666666,
+        "support": 96,
+        "true_positive": 91
+      },
+      "TR_IBAN": {
+        "f1": 0.22627737226277372,
+        "false_negative": 209,
+        "false_positive": 3,
+        "precision": 0.9117647058823529,
+        "recall": 0.12916666666666668,
+        "support": 240,
+        "true_positive": 31
+      },
+      "TR_PHONE": {
+        "f1": 0.9303621169916435,
+        "false_negative": 2,
+        "false_positive": 48,
+        "precision": 0.8743455497382199,
+        "recall": 0.9940476190476191,
+        "support": 336,
+        "true_positive": 334
+      },
+      "TR_PLATE": {
+        "f1": 0.9024943310657596,
+        "false_negative": 41,
+        "false_positive": 2,
+        "precision": 0.9900497512437811,
+        "recall": 0.8291666666666667,
+        "support": 240,
+        "true_positive": 199
+      },
+      "TR_SGK": {
+        "f1": 0.0,
+        "false_negative": 240,
+        "false_positive": 2,
+        "precision": 0.0,
+        "recall": 0.0,
+        "support": 240,
+        "true_positive": 0
+      },
+      "TR_TCKN": {
+        "f1": 0.0,
+        "false_negative": 432,
+        "false_positive": 1,
+        "precision": 0.0,
+        "recall": 0.0,
+        "support": 432,
+        "true_positive": 0
+      },
+      "TR_VKN": {
+        "f1": 0.0,
+        "false_negative": 192,
+        "false_positive": 0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "support": 192,
+        "true_positive": 0
+      },
+      "UNION": {
+        "f1": 1.0,
+        "false_negative": 0,
+        "false_positive": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "support": 96,
+        "true_positive": 96
+      }
+    }
+  }
+}

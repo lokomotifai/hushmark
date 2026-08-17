@@ -3,6 +3,19 @@
 All notable changes are recorded here. The project follows a fixed product version across its
 packages and uses semantic versioning before 1.0 with breaking changes permitted on minor bumps.
 
+## Unreleased
+
+- Added competitor benchmark adapters: bare GLiNER, Presidio configured for Turkish, and an
+  OpenAI LLM redactor whose spans are resolved against the source text instead of trusting
+  model-reported offsets.
+- Added decision-grade benchmark slices: per-example latency percentiles, Turkish morphology
+  recall, KVKK m.6 special-category recall, and entity-type coverage.
+- Added a cross-engine comparison renderer and `docs/benchmark-comparison.md`.
+- Pointed the `hushmark-tr` registry entry at the published `lokomotifai/hushmark-tr-289m`
+  repository so the pinned weights and ONNX export are fetchable and reproducible.
+- Fixed model bootstrap reformatting the materialized runtime config, which made its bytes
+  diverge from the pinned source and failed the runtime integrity check on every Torch load.
+
 ## 0.1.1 — 2026-08-15
 
 - Fixed private-key ReDoS, Unicode digit bypasses, masking complexity, and request-size abuse.

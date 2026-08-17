@@ -37,3 +37,4 @@ bench/external/
 /dataset-prep/
 /security-review.md
 /roast.md
+.cache/

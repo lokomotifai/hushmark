@@ -1,11 +1,12 @@
 models:
   - id: hushmark-tr
-    source: local/ac1-guarded-retry
-    revision: a8f8bc87fdd4d4a92898513fd87eed9e7ccd2b6603ef1d1d5ce152e49192b6c2
+    source: lokomotifai/hushmark-tr-289m
+    revision: 31a6896cc6c1a0eb6efd53b782716207313066ac
     license: Apache-2.0
-    distribution: local-artifact
+    distribution: remote
     files:
       - path: gliner_config.source.json
+        remote_path: gliner_config.json
         size: 2312
         sha256: 61a066493aa5b64280be2af4686337553e9f7119f5c77f52e301e8b0ce5c2577
       - path: pytorch_model.bin

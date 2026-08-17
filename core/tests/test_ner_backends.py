@@ -14,8 +14,8 @@ ROOT = Path(__file__).resolve().parents[2]
 
 def test_registry_pins_adopted_hushmark_tr_artifacts() -> None:
     spec = load_model_spec(ROOT / "core" / "models.yaml", "hushmark-tr")
-    assert spec.distribution == "local-artifact"
-    assert spec.revision == "a8f8bc87fdd4d4a92898513fd87eed9e7ccd2b6603ef1d1d5ce152e49192b6c2"
+    assert spec.distribution == "remote"
+    assert spec.revision == "31a6896cc6c1a0eb6efd53b782716207313066ac"
     assert spec.sha256 == "a8f8bc87fdd4d4a92898513fd87eed9e7ccd2b6603ef1d1d5ce152e49192b6c2"
     assert spec.labels["PERSON"] == "person"
     assert spec.onnx_confidence_scale == pytest.approx(0.4 / 0.55)
