@@ -1,0 +1,106 @@
+header:
+  schema-version: 2.2.0
+  last-updated: "2026-08-17"
+  last-reviewed: "2026-08-17"
+  url: https://raw.githubusercontent.com/lokomotifai/hushmark/main/SECURITY-INSIGHTS.yml
+  comment: >-
+    Turkish-first PII detection, reversible masking, and controlled restoration for AI traffic.
+    This file describes the project's practices; it is not a certification or an audit result.
+project:
+  name: Hushmark
+  administrators:
+    - name: Hushmark maintainers
+      affiliation: Lokomotif AI
+  repositories:
+    - name: hushmark
+      url: https://github.com/lokomotifai/hushmark
+      comment: Canonical development repository.
+    - name: hushmark-open-core
+      url: https://github.com/lokomotifai/hushmark-open-core
+      comment: Allowlist-generated, source-only release mirror. Public releases are tagged here.
+  vulnerability-reporting:
+    reports-accepted: true
+    bug-bounty-available: false
+    security-policy: https://github.com/lokomotifai/hushmark/blob/main/SECURITY.md
+    comment: >-
+      Private vulnerability reporting is preferred. Never include real personal data, customer
+      payloads, resolved placeholder values, or issuer private keys in a report.
+  documentation:
+    detailed-guide: https://github.com/lokomotifai/hushmark/tree/main/docs
+    code-of-conduct: https://github.com/lokomotifai/hushmark/blob/main/CODE_OF_CONDUCT.md
+    security-policy: https://github.com/lokomotifai/hushmark/blob/main/SECURITY.md
+    threat-model: https://github.com/lokomotifai/hushmark/blob/main/docs/security.md
+repository:
+  url: https://github.com/lokomotifai/hushmark
+  status: active
+  accepts-change-request: true
+  accepts-automated-change-request: true
+  core-team:
+    - name: Hushmark maintainers
+      affiliation: Lokomotif AI
+  license:
+    url: https://github.com/lokomotifai/hushmark/blob/main/LICENSE
+    expression: Apache-2.0
+  documentation:
+    contributing-guide: https://github.com/lokomotifai/hushmark/blob/main/CONTRIBUTING.md
+    governance: https://github.com/lokomotifai/hushmark/blob/main/GOVERNANCE.md
+    security-policy: https://github.com/lokomotifai/hushmark/blob/main/SECURITY.md
+    review-policy: https://github.com/lokomotifai/hushmark/blob/main/CONTRIBUTING.md#review-and-acceptance
+  security:
+    assessments:
+      self:
+        comment: >-
+          Executable repository gates only: a STRIDE analysis in docs/security.md, deterministic
+          unit and property tests, no-body logging tests, RBAC and CSRF tests, dependency boundary
+          checks, container build-context and corpus-leak scans, Grype vulnerability budgets, and
+          SBOM attestation verification. No penetration test, external audit, or certification.
+    tools:
+      - name: Grype
+        type: SCA
+        version: 0.116.1
+        rulesets:
+          - built-in
+        integration:
+          ad-hoc: false
+          ci: true
+          before-release: true
+        comment: Container vulnerability budget; fails the build on fixable critical findings.
+      - name: Syft
+        type: SBOM
+        version: 1.50.0
+        integration:
+          ad-hoc: false
+          ci: true
+          before-release: true
+        comment: CycloneDX and SPDX SBOMs, attached to published images as Cosign attestations.
+      - name: Cosign
+        type: other
+        version: 3.1.3
+        integration:
+          ad-hoc: false
+          ci: true
+          before-release: true
+        comment: >-
+          Keyless signing and attestation of published images under GitHub Actions OIDC, verified
+          in the same job against the publishing workflow's certificate identity.
+      - name: Renovate
+        type: SCA
+        integration:
+          ad-hoc: false
+          ci: true
+          before-release: false
+        comment: Weekly dependency updates with GitHub Action digest pinning; majors isolated.
+      - name: mypy and typescript
+        type: SAST
+        integration:
+          ad-hoc: true
+          ci: true
+          before-release: true
+        comment: Strict type checking across both language stacks.
+      - name: import-linter and dependency-cruiser
+        type: SAST
+        integration:
+          ad-hoc: true
+          ci: true
+          before-release: true
+        comment: Enforces module boundaries so the detection core stays independent of products.

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 132 132" width="132" height="132" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Hushmark mark: three lines of text on a dark tile, the middle line replaced by a red masked span between bracket ticks." font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif">
+  <title>Hushmark</title>
+  <desc>Hushmark mark: three lines of text on a dark tile, the middle line replaced by a red masked span between bracket ticks.</desc>
+  <rect x="0" y="0" width="132" height="132" rx="30" fill="#111111"/>
+  <rect x="6.5" y="6.5" width="119" height="119" rx="24" fill="none" stroke="#FBFAF8" stroke-opacity="0.14" stroke-width="1"/>
+  <rect x="29" y="40" width="52" height="10" rx="5" fill="#FBFAF8" fill-opacity="0.5"/>
+  <rect x="26" y="56" width="3" height="20" rx="1.5" fill="#D11F26"/>
+  <rect x="31" y="61" width="66" height="10" rx="5" fill="#D11F26"/>
+  <rect x="99" y="56" width="3" height="20" rx="1.5" fill="#D11F26"/>
+  <rect x="29" y="82" width="38" height="10" rx="5" fill="#FBFAF8" fill-opacity="0.5"/>
+</svg>
