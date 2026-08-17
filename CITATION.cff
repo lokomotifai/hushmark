@@ -9,5 +9,22 @@ authors:
 repository-code: "https://github.com/lokomotifai/hushmark"
 url: "https://github.com/lokomotifai/hushmark"
 version: 0.1.1
-date-released: 2026-08-10
+date-released: 2026-08-15
 license: Apache-2.0
+keywords:
+  - pii-detection
+  - data-masking
+  - named-entity-recognition
+  - turkish
+  - kvkk
+  - privacy
+  - llm-gateway
+references:
+  - type: software
+    title: hushmark-tr-289m
+    abstract: "Turkish PII named-entity recognition model used by Hushmark's detection core."
+    authors:
+      - family-names: Guner
+        given-names: Fatih
+    url: "https://huggingface.co/lokomotifai/hushmark-tr-289m"
+    license: Apache-2.0

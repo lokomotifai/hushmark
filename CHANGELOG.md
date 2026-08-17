@@ -15,6 +15,12 @@ packages and uses semantic versioning before 1.0 with breaking changes permitted
   repository so the pinned weights and ONNX export are fetchable and reproducible.
 - Fixed model bootstrap reformatting the materialized runtime config, which made its bytes
   diverge from the pinned source and failed the runtime integrity check on every Torch load.
+- Rewrote both READMEs around the mechanism, the taxonomy, and the measured evidence, with
+  brand and diagram assets under `assets/`.
+- Added architecture decision records in `docs/adr/`, a `SECURITY-INSIGHTS.yml` summary, and
+  expanded the contribution, governance, support, and maintainer documents.
+- Extended the claim-language lint to the repository landing pages, and corrected the documented
+  pnpm version and model distribution path.
 
 ## 0.1.1 — 2026-08-15
 
