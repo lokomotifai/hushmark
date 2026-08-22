@@ -2,8 +2,10 @@
 set -euo pipefail
 
 repo_dir=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
-torch_version=${HUSHMARK_TORCH_VERSION:-2.13.0}
-torch_index_url=${HUSHMARK_TORCH_INDEX_URL:-https://download.pytorch.org/whl/cu130}
+torch_version=2.13.0
+torch_index_url=https://download.pytorch.org/whl/cu130
+torch_wheel_url=https://download-r2.pytorch.org/whl/cu130/torch-2.13.0%2Bcu130-cp312-cp312-manylinux_2_28_x86_64.whl
+torch_wheel_sha256=8db7338e6895c3d4bd89a02ff4209507d1f0cf2ffeb3b898538b5a07d1ea8c1e
 uv_cache_dir=${HUSHMARK_UV_CACHE_DIR:-/workspace/.cache/hushmark-uv}
 fetch_models=${HUSHMARK_FETCH_MODELS:-1}
 
@@ -12,11 +14,27 @@ print_plan() {
   echo "python=3.12"
   echo "torch=$torch_version"
   echo "torch_index=$torch_index_url"
+  echo "torch_wheel=$torch_wheel_url"
+  echo "torch_wheel_sha256=$torch_wheel_sha256"
   echo "uv_cache=$uv_cache_dir"
   echo "fetch_models=$fetch_models"
   echo "sync=uv sync --frozen --all-packages --no-install-package torch"
-  echo "install=uv pip install --python .venv/bin/python --reinstall torch==$torch_version"
+  echo "install=uv pip install --python .venv/bin/python --reinstall <pinned-wheel>#sha256=<pinned-hash>"
   echo "execution=.venv/bin/python (uv run is intentionally not used after the CUDA override)"
+}
+
+verify_platform() {
+  .venv/bin/python - <<'PY'
+import platform
+import sys
+
+if sys.version_info[:2] != (3, 12):
+    raise SystemExit(f"GPU wheel requires Python 3.12, got {platform.python_version()}")
+if platform.system() != "Linux" or platform.machine() != "x86_64":
+    raise SystemExit(
+        f"GPU wheel requires Linux x86_64, got {platform.system()} {platform.machine()}"
+    )
+PY
 }
 
 verify_cuda() {
@@ -82,10 +100,11 @@ export UV_CACHE_DIR="$uv_cache_dir"
 print_plan
 nvidia-smi
 uv sync --frozen --all-packages --no-install-package torch
+verify_platform
 uv pip install \
   --python .venv/bin/python \
   --reinstall \
-  "torch==$torch_version" \
+  "${torch_wheel_url}#sha256=${torch_wheel_sha256}" \
   --index-url "$torch_index_url"
 verify_cuda
 

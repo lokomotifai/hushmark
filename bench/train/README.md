@@ -39,6 +39,19 @@ evaluation/development source labels, colliding record IDs, and identical model-
 The earlier `legacy` synthesis profile exists only to reproduce historical WP-10 evidence and must
 not be used for a full run.
 
+## Legacy/new replay preparation
+
+The next `hushmark-tr` candidate uses the same 200,592-row `synthetic-full` corpus plus the approved
+new prepared train split. `prepare_replay.py` rejects source mismatches, duplicate IDs, and
+cross-source content overlap before writing a digest-bound union. GPU sampling then fixes each
+epoch to 70% legacy and 30% new rows, with label balancing inside each source. Legacy and new
+validation suites remain separate in reports and are combined only from exact span counts.
+
+Both the old locked benchmark and the new locked split are supplied to training only as isolation
+sets. Neither is used for checkpoint selection or tuning. The final candidate must first pass the
+old locked verdict, then beat the incumbent on the new PERSON/ADDRESS/DOB holdout without adding
+false positives on empty-gold documents.
+
 ## AI4Privacy Turkish bootstrap (`net-required`, optional)
 
 The adapter supports the current `pii-masking-openpii-1m` export schema (`source_text`, `language`,

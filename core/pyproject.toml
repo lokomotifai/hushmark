@@ -8,6 +8,7 @@ license = "Apache-2.0"
 dependencies = [
   "fastapi>=0.116.0",
   "gliner>=0.2.24",
+  "huggingface-hub>=0.34.0,<2",
   "httpx>=0.28.0",
   "onnx>=1.18.0",
   "onnxruntime>=1.22.0",
@@ -15,8 +16,10 @@ dependencies = [
   "pydantic>=2.11.0",
   "pydantic-settings>=2.10.0",
   "pyyaml>=6.0.2",
+  "safetensors>=0.5.0,<1",
   "structlog>=25.4.0",
   "torch>=2.10.0",
+  "transformers>=4.51.0,<6",
   "uvicorn>=0.35.0",
 ]
 

@@ -1,64 +1,79 @@
-# AC-1 RunPod execution runbook
+# Hushmark replay training on RunPod
 
-This runbook executes only the separately authorized AC-1 model-training operation. It does not
-publish artifacts, push a repository, or perform any AC-2 operation.
+This runbook trains the next `hushmark-tr` candidate from the pinned
+`gliner_multi_pii-v1` base. It reuses the 200,592-row legacy synthetic corpus and adds the
+approved 28,000-row new corpus. It does not publish or register a model automatically.
 
-## Pod settings
+## Fixed configuration
 
-Use a **Secure Cloud**, **On-Demand** Pod with one **A100 80 GB** GPU and the official RunPod
-PyTorch template. Select a template with Python 3.12 support, enable full SSH, and attach either a
-100 GB Network Volume or a 100 GB Pod Volume at `/workspace`. Network Volumes survive Pod deletion;
-Pod Volumes are deleted with the Pod. RunPod documents that Network Volumes are not encrypted. Put
-only the synthetic/public training inputs and model artifacts on either volume; never put customer
-prompts, secrets, or production personal data there. Confirm the live hourly price in the console
-before deployment.
+- RunPod Secure Cloud, On-Demand, one A100 80 GB GPU.
+- Official RunPod PyTorch image with full SSH.
+- 100 GB encrypted Pod Volume mounted at `/workspace`; do not use an unencrypted Network Volume.
+- Python 3.12 and the CUDA Torch wheel pinned by `scripts/bootstrap-gpu.sh`.
+- Frozen text encoder, batch size 16, automatic BF16/FP16, seed `20260809`.
+- Each epoch contains 70% legacy replay and 30% new examples. Label balancing happens separately
+  inside both sources.
+- Checkpoints and validation every 100 optimizer steps, with two recoverable checkpoints retained.
+- A 500-step pilot must pass the machine gate before the full run is allowed.
 
-The run is single-GPU. Do not select a multi-GPU Pod. On-Demand avoids interruption during the
-first full run; checkpoint/resume is still enabled for operator error or Pod failure.
+The live GPU price and availability must be checked immediately before Pod creation. Storage is
+also billable while the Pod exists. Set a RunPod cost alert and terminate the Pod after local
+artifact verification.
 
-## 1. Build and verify the transfer artifact locally
+## 1. Build two local transfer archives
 
-From the repository root:
+The code bundle is source-only. The data bundle contains only the approved new train, validation,
+and locked-test views plus governance evidence. It excludes research sources, public-document
+corpora, model weights, generated legacy data, and Git metadata.
 
 ```bash
 UV_CACHE_DIR=/tmp/hushmark-uv-cache uv run python scripts/build-training-bundle.py
-shasum -a 256 dist/hushmark-ac1-training-0.1.1.tar.gz
+UV_CACHE_DIR=/tmp/hushmark-uv-cache uv run python scripts/build-training-data-bundle.py
+shasum -a 256 \
+  dist/hushmark-replay-training-0.2.0.tar.gz \
+  dist/hushmark-replay-data-0.2.0.tar.gz
 ```
 
-The archive is generated from an explicit allowlist. It contains source, the locked public
-benchmark, bootstrap code, and this runbook. It excludes the private research corpus, generated
-training data, checkpoints, model weights, and all Git metadata.
-
-Use the full SSH command shown by RunPod's **Connect** panel to transfer the archive. Full SSH is
-required for SCP; replace the example host and port with the panel's values:
+Generate a task-specific SSH key instead of reusing a personal key. Add its public half to the Pod
+and keep the private half only until artifacts have been retrieved.
 
 ```bash
-scp -P RUNPOD_SSH_PORT dist/hushmark-ac1-training-0.1.1.tar.gz \
+mkdir -p /tmp/hushmark-runpod-ssh
+ssh-keygen -q -t ed25519 -N '' \
+  -f /tmp/hushmark-runpod-ssh/id_ed25519 \
+  -C hushmark-replay-training
+```
+
+Transfer both archives using the exact public IP and SSH port shown by RunPod:
+
+```bash
+scp -i /tmp/hushmark-runpod-ssh/id_ed25519 -P RUNPOD_SSH_PORT \
+  dist/hushmark-replay-training-0.2.0.tar.gz \
+  dist/hushmark-replay-data-0.2.0.tar.gz \
   root@RUNPOD_PUBLIC_IP:/workspace/
 ```
 
-## 2. Verify before executing bundled code
-
-In the Pod terminal:
+## 2. Verify before executing transferred code
 
 ```bash
 cd /workspace
-tar -xzf hushmark-ac1-training-0.1.1.tar.gz
-cd hushmark-ac1-training-0.1.1
+tar -xzf hushmark-replay-training-0.2.0.tar.gz
+tar -xzf hushmark-replay-data-0.2.0.tar.gz
+
+cd /workspace/hushmark-replay-training-0.2.0
 python3 scripts/verify-training-bundle.py
+
+cd /workspace/hushmark-replay-data-0.2.0
+python3 scripts/verify-training-data-bundle.py
 ```
 
-Stop if verification does not report the number of verified allowlisted files.
+Stop if either verifier fails. Never copy customer prompts, credentials, production personal data,
+or the private research corpus to the Pod.
 
 ## 3. Bootstrap the pinned CUDA environment
 
-Install the pinned environment manager in an isolated bootstrap virtual environment, then run the
-CUDA-specific bootstrap. The isolated install works on PEP 668 externally-managed Python images
-without changing the system interpreter. The CUDA bootstrap intentionally replaces the
-workspace's CPU-only Torch wheel with the official PyTorch 2.13.0 CUDA 13.0 wheel and verifies the
-GPU before downloading the pinned GLiNER model.
-
 ```bash
+cd /workspace/hushmark-replay-training-0.2.0
 python3 -m venv /workspace/.uv-bootstrap
 /workspace/.uv-bootstrap/bin/python -m pip install --disable-pip-version-check uv==0.12.3
 export PATH=/workspace/.uv-bootstrap/bin:/usr/local/bin:/usr/bin:/bin
@@ -66,17 +81,15 @@ bash scripts/bootstrap-gpu.sh
 bash scripts/bootstrap-gpu.sh --check
 ```
 
-After bootstrap, always invoke `.venv/bin/python` directly. Running `uv run` can reconcile the
-environment back to the CPU-only Torch wheel recorded for normal offline development.
+The bootstrap downloads the registry-pinned GLiNER base and tokenizer, verifies their SHA-256
+digests, and installs the reviewed CUDA Torch wheel. Afterward invoke `.venv/bin/python` directly;
+do not run `uv run`, because it can restore the CPU Torch lock.
 
-## 4. Generate isolated development and training corpora
-
-Reserve 1,008 development rows after the 2,016 locked final-evaluation rows. The `full` synthesis
-profile then skips both reserved ranges before creating 200,592 training rows. Training performs a
-second isolation check across all three sets using IDs and model-visible content. Development is
-used for checkpoint selection; the locked benchmark remains untouched until the one final verdict.
+## 4. Reproduce legacy data and construct the replay union
 
 ```bash
+cd /workspace/hushmark-replay-training-0.2.0
+
 .venv/bin/python bench/train/synthesize_dev.py \
   --seed 20260809 \
   --output bench/train/outputs/synthetic-dev.jsonl
@@ -90,23 +103,32 @@ used for checkpoint selection; the locked benchmark remains untouched until the 
   --input bench/train/outputs/synthetic-full.jsonl \
   --source-format synthetic-full \
   --output bench/train/outputs/synthetic-full-gliner.jsonl
+
+.venv/bin/python bench/train/prepare_replay.py \
+  --legacy bench/train/outputs/synthetic-full-gliner.jsonl \
+  --new /workspace/hushmark-replay-data-0.2.0/data/new/train.jsonl \
+  --output bench/train/outputs/replay-train.jsonl \
+  --manifest bench/train/outputs/replay-train.manifest.json
 ```
 
-Retain both generated metadata files and all printed SHA-256 values with the run evidence.
+The replay builder requires exactly the `synthetic-full` and `hushmark-dataset-prep-v1` sources,
+rejects duplicate IDs and model-visible content overlap, and writes a digest-bound union manifest.
+Training independently checks train/validation/locked-test isolation. The locked test files are
+used only for overlap detection until final evaluation.
 
-## 5. Run a bounded hardware pilot
-
-The pilot uses the real full and development datasets but stops after 500 optimizer steps. Its
-manifest is explicitly ineligible for adoption. It validates memory, loss, mixed precision,
-balanced sampling, validation metrics, best-checkpoint selection, and early stopping before the
-binding run.
+## 5. Run the 500-step hardware pilot
 
 ```bash
 .venv/bin/python bench/train/train.py \
   --authorized-full-run \
-  --data bench/train/outputs/synthetic-full-gliner.jsonl \
-  --validation-data bench/train/outputs/synthetic-dev.jsonl \
-  --output bench/train/outputs/a100-pilot \
+  --data bench/train/outputs/replay-train.jsonl \
+  --validation-suite legacy=bench/train/outputs/synthetic-dev.jsonl \
+  --validation-suite new=/workspace/hushmark-replay-data-0.2.0/data/new/validation.jsonl \
+  --evaluation-suite new_locked=/workspace/hushmark-replay-data-0.2.0/data/new/test_locked.jsonl \
+  --replay-source synthetic-full \
+  --new-source hushmark-dataset-prep-v1 \
+  --replay-ratio 0.70 \
+  --output bench/train/outputs/a100-replay-pilot \
   --device cuda \
   --amp auto \
   --epochs 3 \
@@ -115,24 +137,31 @@ binding run.
   --validation-every 100 \
   --checkpoint-every 100 \
   --keep-checkpoints 2
+
+.venv/bin/python bench/train/check_pilot.py \
+  --manifest bench/train/outputs/a100-replay-pilot/training_manifest.json
 ```
 
-Inspect `bench/train/outputs/a100-pilot/training_manifest.json`. Require `run_kind: pilot`,
-`complete: false`, `adoption_eligible: false`, a finite loss, `hardware.gpu_name` containing A100,
-and reasonable peak memory. Also require development macro-F1 to improve without an over-limit
-per-type regression before reusing the configuration. If it does not, create a new bounded pilot;
-never tune against the locked benchmark.
+The checker exits non-zero unless the pilot reaches exactly 500 steps on an A100, uses mixed
+precision, has finite losses, stays below the 80 GB safety boundary, remains adoption-ineligible,
+and passes the combined legacy/new development gate. Do not start full training after a failed
+pilot. Diagnose the pilot without consulting either locked test.
 
-## 6. Run and, if needed, resume full training
+## 6. Run or resume full training
 
-Start the production candidate in a new directory:
+Only after the pilot checker returns `{"pass": true, ...}`:
 
 ```bash
 .venv/bin/python bench/train/train.py \
   --authorized-full-run \
-  --data bench/train/outputs/synthetic-full-gliner.jsonl \
-  --validation-data bench/train/outputs/synthetic-dev.jsonl \
-  --output bench/train/outputs/a100-full \
+  --data bench/train/outputs/replay-train.jsonl \
+  --validation-suite legacy=bench/train/outputs/synthetic-dev.jsonl \
+  --validation-suite new=/workspace/hushmark-replay-data-0.2.0/data/new/validation.jsonl \
+  --evaluation-suite new_locked=/workspace/hushmark-replay-data-0.2.0/data/new/test_locked.jsonl \
+  --replay-source synthetic-full \
+  --new-source hushmark-dataset-prep-v1 \
+  --replay-ratio 0.70 \
+  --output bench/train/outputs/a100-replay-full \
   --device cuda \
   --amp auto \
   --epochs 3 \
@@ -143,97 +172,73 @@ Start the production candidate in a new directory:
   --keep-checkpoints 2
 ```
 
-If the process or Pod stops, recreate the Pod with the same Network Volume and execute the exact
-same command plus `--resume-from latest`. Do not change data, development data, seed, epochs, batch
-size, learning rates, sampling, validation cadence, device, or AMP mode; the run fingerprint
-rejects incompatible resumes.
+If the process stops, repeat the identical command and append `--resume-from latest`. The run
+fingerprint rejects changes to data, suite hashes, replay ratio, seed, hyperparameters, or hardware
+mode. The completed manifest must contain `run_kind: full`, `complete: true`,
+`development_gate_pass: true`, and `adoption_eligible: true`.
 
-```bash
-.venv/bin/python bench/train/train.py \
-  --authorized-full-run \
-  --data bench/train/outputs/synthetic-full-gliner.jsonl \
-  --validation-data bench/train/outputs/synthetic-dev.jsonl \
-  --output bench/train/outputs/a100-full \
-  --device cuda \
-  --amp auto \
-  --epochs 3 \
-  --batch-size 16 \
-  --validation-every 100 \
-  --early-stopping-patience 5 \
-  --checkpoint-every 100 \
-  --keep-checkpoints 2 \
-  --resume-from latest
-```
+## 7. One-time legacy evaluation and artifact retrieval
 
-The completed manifest must say `run_kind: full`, `complete: true`,
-`development_gate_pass: true`, and `adoption_eligible: true` before final evaluation. The selected
-weights must come from `development_best_step`, not merely the last optimizer step.
-
-## 7. Evaluate and retrieve evidence
-
-Evaluate the completed checkpoint against all 2,016 locked rows:
+Run the old locked benchmark exactly once against the development-selected full checkpoint:
 
 ```bash
 .venv/bin/python bench/train/evaluate.py \
-  --checkpoint bench/train/outputs/a100-full \
-  --report bench/train/outputs/a100-full-verdict.json \
+  --checkpoint bench/train/outputs/a100-replay-full \
+  --report bench/train/outputs/a100-replay-full-legacy-verdict.json \
   --device cuda
 ```
 
-The locked command is run exactly once for a development-selected candidate. The machine verdict
-adopts the model only if NER macro strict-F1 improves by at least 0.05 and no NER type regresses by
-more than 0.02 strict-F1. A failed verdict is a valid experiment result; do not tune against the
-locked report or change the incumbent registry.
-
-If and only if the locked verdict says `adopt: true`, export ONNX through the supported GLiNER
-export API. Calibrate thresholds on development data only. First use one inference pass to compare
-a threshold grid, then rerun the chosen fixed threshold over all development rows with batching:
+Archive the candidate and evidence, generate its digest, then download both files:
 
 ```bash
-.venv/bin/python bench/train/calibrate_onnx.py \
-  --checkpoint bench/train/outputs/a100-full \
-  --validation-data bench/train/outputs/synthetic-dev.jsonl \
-  --onnx-model-file model.onnx \
-  --threshold 0.1 --threshold 0.2 --threshold 0.275 --threshold 0.4 --threshold 0.5 \
-  --report bench/train/outputs/a100-full/onnx-fp32-calibration.json
-
-.venv/bin/python bench/train/calibrate_onnx.py \
-  --checkpoint bench/train/outputs/a100-full \
-  --validation-data bench/train/outputs/synthetic-dev.jsonl \
-  --onnx-model-file model.onnx \
-  --threshold <chosen-development-threshold> \
-  --batch-size 8 \
-  --report bench/train/outputs/a100-full/onnx-fp32-validation.json
+cd /workspace/hushmark-replay-training-0.2.0
+tar -czf /workspace/hushmark-replay-candidate.tar.gz \
+  bench/train/outputs/a100-replay-full \
+  bench/train/outputs/a100-replay-full-legacy-verdict.json \
+  bench/train/outputs/a100-replay-pilot/training_manifest.json \
+  bench/train/outputs/replay-train.manifest.json \
+  bench/train/outputs/synthetic-dev.metadata.json \
+  bench/train/outputs/synthetic-full.metadata.json
+sha256sum /workspace/hushmark-replay-candidate.tar.gz \
+  > /workspace/hushmark-replay-candidate.tar.gz.sha256
 ```
 
-Compare the full-development ONNX report with the Torch development-best report. Reject an export
-if its macro strict-F1 loss or any per-type loss exceeds 0.02. Quantized and FP32 graphs are
-separate candidates: a failed INT8 result must remain evidence-only and must never replace a
-passing FP32 graph. Pin the adopted ONNX size, SHA-256, opset, and effective-threshold scale in
-`core/models.yaml`, then verify the exact local artifact with `tools/export-onnx.py --verify-only`.
+```bash
+scp -i /tmp/hushmark-runpod-ssh/id_ed25519 -P RUNPOD_SSH_PORT \
+  root@RUNPOD_PUBLIC_IP:/workspace/hushmark-replay-candidate.tar.gz \
+  root@RUNPOD_PUBLIC_IP:/workspace/hushmark-replay-candidate.tar.gz.sha256 \
+  dist/
+```
 
-Download these files before terminating the Pod:
+Verify the outer archive and `training_manifest.json` weight digest locally before terminating the
+Pod. Deleting a Pod also deletes its Pod Volume.
 
-- `a100-full/training_manifest.json`
-- `a100-full/run_config.json`
-- `a100-full/pytorch_model.bin` and all checkpoint configuration/tokenizer files
-- `a100-full-verdict.json`
-- `a100-full/development-history.jsonl` and `development-best/validation_report.json`
-- FP32/INT8 ONNX calibration and full-development validation reports, including rejected exports
-- the adopted ONNX graph, its SHA-256, size, and export log
-- `synthetic-dev.metadata.json`
-- `synthetic-full.metadata.json`
+## 8. Final new-holdout comparison, locally
 
-Verify the downloaded weight against `weights_sha256` in the training manifest. Keep the attached
-volume until the local copy and digest are confirmed; then stop and delete the Pod. With a Pod
-Volume, deletion also destroys the remote evidence, so local archive and inner-weight digests must
-both be verified first.
+The incumbent `models/hushmark-tr` stays local. After extracting the candidate, compare both models
+on the untouched 3,500-row new holdout with its data-bundle SHA-256:
 
-## Authoritative references checked for this runbook
+```bash
+NEW_TEST_SHA256=72a231bb7766d502d6d7db9c6d6851291f9d20041e7189a55722224922eb0d11
 
-- [RunPod Pod overview and official PyTorch template](https://docs.runpod.io/pods/overview)
-- [RunPod Network Volumes](https://docs.runpod.io/storage/network-volumes)
-- [RunPod SSH connection modes](https://docs.runpod.io/pods/configuration/use-ssh)
-- [RunPod live GPU pricing](https://www.runpod.io/pricing)
-- [Official PyTorch CUDA wheel matrix](https://pytorch.org/get-started/previous-versions/)
-- [AI4Privacy OpenPII-1M dataset card](https://huggingface.co/datasets/ai4privacy/pii-masking-openpii-1m)
+.venv/bin/python bench/train/evaluate_new_holdout.py \
+  --candidate PATH_TO_EXTRACTED/a100-replay-full \
+  --incumbent models/hushmark-tr \
+  --dataset dataset-prep/prepared/v1/tasks/gliner_hushmark/evaluation/splits/test_locked.jsonl \
+  --dataset-sha256 "$NEW_TEST_SHA256" \
+  --legacy-report PATH_TO_EXTRACTED/a100-replay-full-legacy-verdict.json \
+  --report PATH_TO_EXTRACTED/a100-replay-full-final-verdict.json \
+  --device mps
+```
+
+Adoption requires both gates. The legacy gate requires at least +0.05 macro strict-F1 with no type
+regression over 0.02. The new holdout applies the same rule to PERSON, ADDRESS, and DOB, and also
+forbids any increase in false-positive spans across its 2,224 empty-gold examples. A failed result
+is evidence, not permission to tune against either locked set.
+
+## References
+
+- [RunPod Pod storage and encrypted volumes](https://docs.runpod.io/pods/storage/types)
+- [RunPod SSH connections](https://docs.runpod.io/pods/configuration/use-ssh)
+- [RunPod Pod lifecycle](https://docs.runpod.io/pods/manage-pods)
+- [RunPod Pod pricing](https://docs.runpod.io/pods/pricing)

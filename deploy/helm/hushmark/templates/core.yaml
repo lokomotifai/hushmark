@@ -46,6 +46,8 @@ spec:
               value: {{ .Values.core.nerBackend | quote }}
             - name: HUSHMARK_CORE_NER_THRESHOLD
               value: {{ .Values.core.nerThreshold | quote }}
+            - name: HUSHMARK_CORE_MODEL_ID
+              value: {{ default "hushmark-tr" .Values.core.model.id | quote }}
             - name: HUSHMARK_CORE_BODY_LIMIT_BYTES
               value: {{ printf "%.0f" .Values.core.bodyLimitBytes | quote }}
             - name: HUSHMARK_CORE_MAX_CONCURRENCY

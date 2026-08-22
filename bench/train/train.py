@@ -15,15 +15,15 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from hushmark_bench.dataset import load_dataset
 from hushmark_bench.training import (
     adoption_verdict,
     assert_evaluation_isolation,
     json_lines,
     load_model_labels,
     load_prepared,
-    prepare_hushmark_records,
+    load_validation_examples,
     prepare_record,
+    resolve_training_max_width,
     sha256_file,
     smoke_records,
 )
@@ -33,6 +33,7 @@ from hushmark_bench.training_state import (
     checkpoint_name,
     deterministic_balanced_epoch_indices,
     deterministic_epoch_indices,
+    deterministic_replay_balanced_epoch_indices,
     linear_warmup_decay,
     normalized_progress,
     optimizer_parameter_groups,
@@ -42,9 +43,35 @@ from hushmark_bench.training_state import (
     run_fingerprint,
     write_latest_checkpoint,
 )
-from hushmark_bench.validation import validate_ner_model, validation_rank
+from hushmark_bench.validation import validate_ner_suites, validation_rank
 
 ROOT = Path(__file__).resolve().parents[2]
+
+
+def validation_suite_paths(args: argparse.Namespace) -> dict[str, Path]:
+    suites: dict[str, Path] = {}
+    if args.validation_data is not None:
+        suites["development"] = args.validation_data
+    for specification in getattr(args, "validation_suite", []):
+        name, separator, raw_path = specification.partition("=")
+        if not separator or not name or not raw_path or not name.replace("-", "_").isalnum():
+            raise ValueError("validation suites must use NAME=PATH")
+        if name in suites:
+            raise ValueError(f"duplicate validation suite: {name}")
+        suites[name] = Path(raw_path)
+    return suites
+
+
+def evaluation_suite_paths(args: argparse.Namespace) -> dict[str, Path]:
+    suites = {"legacy_locked": args.evaluation_data}
+    for specification in getattr(args, "evaluation_suite", []):
+        name, separator, raw_path = specification.partition("=")
+        if not separator or not name or not raw_path or not name.replace("-", "_").isalnum():
+            raise ValueError("evaluation suites must use NAME=PATH")
+        if name in suites:
+            raise ValueError(f"duplicate evaluation suite: {name}")
+        suites[name] = Path(raw_path)
+    return suites
 
 
 def optimizer_to_device(optimizer: Any, device: str) -> None:
@@ -195,7 +222,7 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
         torch.backends.cudnn.deterministic = True
 
     labels = load_model_labels(args.registry)
-    validation_examples: list[dict[str, Any]] = []
+    validation_suites: dict[str, list[dict[str, Any]]] = {}
     validation_records: list[dict[str, Any]] = []
     if args.smoke:
         records = (
@@ -213,22 +240,55 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
             )
         if args.data is None:
             raise ValueError("full training requires --data")
-        if args.validation_data is None:
-            raise ValueError("full training requires --validation-data")
+        suite_paths = validation_suite_paths(args)
+        if not suite_paths:
+            raise ValueError("full training requires validation data")
         records = load_prepared(args.data)
-        evaluation_records = prepare_hushmark_records(args.evaluation_data, labels)
-        validation_examples = load_dataset(args.validation_data)
-        validation_records = [
-            prepare_record(example, labels, source="synthetic-dev")
-            for example in validation_examples
+        evaluation_paths = evaluation_suite_paths(args)
+        evaluation_records_by_suite: dict[str, list[dict[str, Any]]] = {}
+        for suite_name, suite_path in evaluation_paths.items():
+            evaluation_records_by_suite[suite_name] = [
+                prepare_record(example, labels, source=f"locked-evaluation-{suite_name}")
+                for example in load_validation_examples(suite_path, labels)
+            ]
+        evaluation_records = [
+            record
+            for suite_records in evaluation_records_by_suite.values()
+            for record in suite_records
         ]
+        validation_records_by_suite: dict[str, list[dict[str, Any]]] = {}
+        for suite_name, suite_path in suite_paths.items():
+            examples = load_validation_examples(suite_path, labels)
+            validation_suites[suite_name] = examples
+            validation_records_by_suite[suite_name] = [
+                prepare_record(example, labels, source=f"validation-{suite_name}")
+                for example in examples
+            ]
+            validation_records.extend(validation_records_by_suite[suite_name])
         assert_evaluation_isolation(records, evaluation_records)
-        assert_evaluation_isolation(records, validation_records)
         assert_evaluation_isolation(validation_records, evaluation_records)
+        suite_names = list(validation_records_by_suite)
+        for index, suite_name in enumerate(suite_names):
+            suite_records = validation_records_by_suite[suite_name]
+            assert_evaluation_isolation(records, suite_records)
+            for other_name in suite_names[index + 1 :]:
+                assert_evaluation_isolation(suite_records, validation_records_by_suite[other_name])
+        evaluation_names = list(evaluation_records_by_suite)
+        for index, suite_name in enumerate(evaluation_names):
+            suite_records = evaluation_records_by_suite[suite_name]
+            for other_name in evaluation_names[index + 1 :]:
+                assert_evaluation_isolation(suite_records, evaluation_records_by_suite[other_name])
         epochs = args.epochs
         batch_size = args.batch_size or 16
     if epochs < 1 or batch_size < 1:
         raise ValueError("epochs and batch size must be positive")
+
+    width_records = [*records, *validation_records]
+    effective_max_width, required_max_width = resolve_training_max_width(
+        args.model_dir,
+        width_records,
+        requested=args.max_width,
+    )
 
     resume_checkpoint = resolve_resume_checkpoint(args.output, args.resume_from)
     if args.output.exists() and resume_checkpoint is None:
@@ -251,8 +311,44 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
         args.learning_rate if args.learning_rate is not None else args.head_learning_rate
     )
     expected_steps = math.ceil(len(records) / batch_size) * epochs
-    validation_sha256 = (
-        sha256_file(args.validation_data) if args.validation_data is not None else None
+    suite_paths = validation_suite_paths(args) if not args.smoke else {}
+    validation_manifest = {
+        name: {
+            "path": str(path),
+            "sha256": sha256_file(path),
+            "examples": len(validation_suites[name]),
+        }
+        for name, path in suite_paths.items()
+    }
+    evaluation_manifest = (
+        {
+            name: {
+                "path": str(path),
+                "sha256": sha256_file(path),
+                "examples": len(evaluation_records_by_suite[name]),
+            }
+            for name, path in evaluation_paths.items()
+        }
+        if not args.smoke
+        else {}
+    )
+    replay_values = (args.replay_source, args.new_source, args.replay_ratio)
+    replay_enabled = any(value is not None for value in replay_values)
+    if replay_enabled:
+        if args.smoke or not all(value is not None for value in replay_values):
+            raise ValueError("replay sampling requires both sources and a ratio on a full run")
+        if not args.balanced_sampling:
+            raise ValueError("replay sampling requires balanced sampling")
+        if not 0.0 < args.replay_ratio < 1.0:
+            raise ValueError("replay ratio must be between zero and one")
+    replay_config = (
+        {
+            "replay_source": args.replay_source,
+            "new_source": args.new_source,
+            "replay_ratio": args.replay_ratio,
+        }
+        if replay_enabled
+        else None
     )
     config = {
         "schema_version": 1,
@@ -267,7 +363,11 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
         "train_text_encoder": args.train_text_encoder and not args.smoke,
         "warmup_steps": args.warmup_steps,
         "balanced_sampling": args.balanced_sampling,
-        "validation_records_sha256": validation_sha256,
+        "replay_sampling": replay_config,
+        "max_width": effective_max_width,
+        "required_gold_max_width": required_max_width,
+        "validation_suites": validation_manifest,
+        "evaluation_suites": evaluation_manifest,
         "validation_every": args.validation_every,
         "early_stopping_patience": args.early_stopping_patience,
         "validation_threshold": args.validation_threshold,
@@ -278,7 +378,12 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
     }
     fingerprint = run_fingerprint(config)
     model_source = resume_checkpoint / "model" if resume_checkpoint else args.model_dir
-    model = GLiNER.from_pretrained(str(model_source), local_files_only=True, map_location="cpu")
+    model = GLiNER.from_pretrained(
+        str(model_source),
+        local_files_only=True,
+        map_location="cpu",
+        max_width=effective_max_width,
+    )
     groups, parameters = optimizer_parameter_groups(
         model,
         train_text_encoder=args.train_text_encoder and not args.smoke,
@@ -318,7 +423,7 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
             torch.cuda.set_rng_state_all(state["cuda_random_state"])
         progress = TrainingProgress(**state["progress"])
         validation_state = state.get("validation_state")
-        if validation_examples and not isinstance(validation_state, dict):
+        if validation_suites and not isinstance(validation_state, dict):
             raise ValueError("resume checkpoint has no compatible validation state")
         resumed_from = str(resume_checkpoint)
         print(
@@ -330,12 +435,12 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
     args.output.mkdir(parents=True, exist_ok=True)
     atomic_write_json(args.output / "run_config.json", {**config, "run_fingerprint": fingerprint})
     history_path = args.output / "development-history.jsonl"
-    if validation_examples and validation_state is None:
+    if validation_suites and validation_state is None:
         model.eval()
         with torch.inference_mode():
-            baseline = validate_ner_model(
+            baseline = validate_ner_suites(
                 model,
-                validation_examples,
+                validation_suites,
                 labels,
                 threshold=args.validation_threshold,
             )
@@ -363,13 +468,13 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
 
     def validate_and_update(step: int) -> bool:
         nonlocal validation_state
-        if not validation_examples or validation_state is None:
+        if not validation_suites or validation_state is None:
             return False
         model.eval()
         with torch.inference_mode():
-            candidate = validate_ner_model(
+            candidate = validate_ner_suites(
                 model,
-                validation_examples,
+                validation_suites,
                 labels,
                 threshold=args.validation_threshold,
             )
@@ -420,11 +525,19 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
             if stop_requested:
                 break
             offset = progress.next_sample_offset if epoch_index == progress.epoch_index else 0
-            indices = (
-                deterministic_balanced_epoch_indices(records, args.seed, epoch_index)
-                if args.balanced_sampling and not args.smoke
-                else deterministic_epoch_indices(len(records), args.seed, epoch_index)
-            )
+            if replay_enabled:
+                indices = deterministic_replay_balanced_epoch_indices(
+                    records,
+                    args.seed,
+                    epoch_index,
+                    replay_source=args.replay_source,
+                    new_source=args.new_source,
+                    replay_ratio=args.replay_ratio,
+                )
+            elif args.balanced_sampling and not args.smoke:
+                indices = deterministic_balanced_epoch_indices(records, args.seed, epoch_index)
+            else:
+                indices = deterministic_epoch_indices(len(records), args.seed, epoch_index)
             remaining = Subset(records, indices[offset:])
             loader = DataLoader(
                 remaining,
@@ -480,7 +593,7 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
                     args.max_steps is not None and progress.global_step >= args.max_steps
                 )
                 validation_due = (
-                    bool(validation_examples) and progress.global_step % args.validation_every == 0
+                    bool(validation_suites) and progress.global_step % args.validation_every == 0
                 )
                 early_stopping_reached = (
                     validate_and_update(progress.global_step) if validation_due else False
@@ -527,7 +640,7 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
 
     if progress.loss_count == 0 or progress.final_loss is None:
         raise RuntimeError("training completed no optimizer steps")
-    if validation_examples and progress.global_step % args.validation_every:
+    if validation_suites and progress.global_step % args.validation_every:
         validate_and_update(progress.global_step)
     if stop_reason is None and progress.epoch_index >= epochs:
         stop_reason = "epochs-complete"
@@ -535,7 +648,7 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
     development_gate_pass = bool(
         validation_state and validation_state["best_report"]["verdict"]["technical_pass"]
     )
-    if validation_examples:
+    if validation_suites:
         materialize_development_best(args.output)
     else:
         model.eval()
@@ -568,12 +681,16 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
         "head_learning_rate": head_learning_rate,
         "warmup_steps": args.warmup_steps,
         "balanced_sampling": args.balanced_sampling,
+        "replay_sampling": replay_config,
+        "max_width": effective_max_width,
+        "required_gold_max_width": required_max_width,
         "mean_loss": progress.loss_sum / progress.loss_count,
         "final_loss": progress.final_loss,
         "elapsed_seconds": elapsed,
         "weights_sha256": sha256_file(weights),
         "training_records_sha256": records_sha256,
-        "validation_records_sha256": validation_sha256,
+        "validation_suites": validation_manifest,
+        "evaluation_suites": evaluation_manifest,
         "development_gate_pass": development_gate_pass,
         "development_best_step": validation_state["best_step"] if validation_state else None,
         "development_best_report": (validation_state["best_report"] if validation_state else None),
@@ -594,10 +711,24 @@ def main() -> int:
     parser.add_argument("--authorized-full-run", action="store_true")
     parser.add_argument("--data", type=Path)
     parser.add_argument("--validation-data", type=Path)
+    parser.add_argument(
+        "--validation-suite",
+        action="append",
+        default=[],
+        metavar="NAME=PATH",
+        help="named validation suite; may be repeated instead of --validation-data",
+    )
     parser.add_argument("--model-dir", type=Path, default=ROOT / "models/gliner_multi_pii-v1")
     parser.add_argument("--registry", type=Path, default=ROOT / "core/models.yaml")
     parser.add_argument(
         "--evaluation-data", type=Path, default=ROOT / "bench/data/hushmark-bench-v0.jsonl"
+    )
+    parser.add_argument(
+        "--evaluation-suite",
+        action="append",
+        default=[],
+        metavar="NAME=PATH",
+        help="additional locked evaluation suite used only for overlap checks; may be repeated",
     )
     parser.add_argument("--output", type=Path)
     parser.add_argument("--resume-from", type=Path, help="checkpoint path or the literal 'latest'")
@@ -618,10 +749,18 @@ def main() -> int:
     parser.add_argument("--validation-min-delta", type=float, default=0.002)
     parser.add_argument("--validation-threshold", type=float, default=0.55)
     parser.add_argument(
+        "--max-width",
+        type=int,
+        help="GLiNER candidate width; defaults to the widest gold span or the base model width",
+    )
+    parser.add_argument(
         "--balanced-sampling",
         action=argparse.BooleanOptionalAction,
         default=True,
     )
+    parser.add_argument("--replay-source")
+    parser.add_argument("--new-source")
+    parser.add_argument("--replay-ratio", type=float)
     parser.add_argument("--device", choices=("cpu", "cuda", "mps"), default="cuda")
     parser.add_argument("--amp", choices=("auto", "off", "bf16", "fp16"), default="auto")
     parser.add_argument("--max-steps", type=int, help="bounded pilot; never adoption-eligible")

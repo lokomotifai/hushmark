@@ -40,6 +40,46 @@ models:
       CRIMINAL: criminal record
       BIOMETRIC_REF: biometric data
       UNION: trade union membership
+  - id: hushmark-berturk-112m
+    architecture: berturk-fixed-span-ner
+    source: lokomotifai/hushmark-berturk-112m
+    revision: 49ed7596936fd1ba28a26b788abcfb8c7b963a5c
+    license: Apache-2.0
+    distribution: private-huggingface
+    primary_file: encoder/model.safetensors
+    artifact_sha256: ce319a22f131fd62b49df85261fb33c1dff871c075f3bc37d2d3be0fb9db383a
+    files:
+      - path: encoder/config.json
+        size: 670
+        sha256: 8b0a1243cba8b60b6b6e0f8ab9870a4b43c4b90f1532171f1d5cb343da7e2a5c
+      - path: encoder/model.safetensors
+        size: 442491744
+        sha256: a2426b32e90cc97909bcdb1e8518d0bfd5fbf6e7d4e9401565a389fb23807d2f
+      - path: hushmark_span_config.json
+        size: 452
+        sha256: d937b71b177fb88aa1a73ec4ef82ca36619d34c21eb625a9f73e3099903c3aa5
+      - path: span_head.safetensors
+        size: 7222884
+        sha256: 49606104c71b9f10bac64086e43e6c528dd50566a18131bdd419ed7634e32af6
+      - path: tokenizer/tokenizer.json
+        size: 754779
+        sha256: 2f4239bea9bf5ccee21c5a7295d12284fdc07bf6b4912c9eef62cbdec19bee8e
+      - path: tokenizer/tokenizer_config.json
+        size: 368
+        sha256: 14a04ec63b735df40567a64272883562962281fd9870738f44e4f39f52c21544
+    labels:
+      PERSON: person
+      ADDRESS: full address
+      ORG: organization
+      DOB: date of birth
+      HEALTH: medical condition
+      RELIGION: religious belief
+      ETHNICITY: ethnic origin
+      POLITICAL: political opinion
+      SEXUAL_LIFE: sexual orientation
+      CRIMINAL: criminal record
+      BIOMETRIC_REF: biometric data
+      UNION: trade union membership
   - id: gliner_multi_pii-v1
     source: urchade/gliner_multi_pii-v1
     revision: 1fcf13e85f4eef5394e1fcd406cf2ca9ea82351d

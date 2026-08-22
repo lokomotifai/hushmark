@@ -54,6 +54,12 @@ class OnnxNerBackend:
     def load(self) -> None:
         if self._model is not None:
             return
+        if (
+            self._spec.onnx_file is None
+            or self._spec.onnx_size is None
+            or self._spec.onnx_sha256 is None
+        ):
+            raise OnnxUnsupported(f"{self._spec.id} has no pinned ONNX export")
         model_file = self._model_dir / self._onnx_model_file
         if not model_file.is_file():
             raise OnnxUnsupported(

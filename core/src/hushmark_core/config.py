@@ -25,7 +25,10 @@ class Settings(BaseSettings):
     host: str = "127.0.0.1"
     port: int = Field(default=8000, ge=1, le=65535)
     log_level: Literal["debug", "info", "warning", "error"] = "info"
-    ner_backend: Literal["disabled", "torch", "onnx"] = "torch"
+    ner_backend: Literal["disabled", "torch", "onnx", "berturk"] = Field(
+        default="torch",
+        description="NER backend: disabled, torch GLiNER, onnx GLiNER, or berturk.",
+    )
     ner_threshold: float = Field(default=0.55, ge=0.0, le=1.0)
     ner_thresholds: dict[str, float] = Field(default_factory=dict)
     model_id: str = "hushmark-tr"

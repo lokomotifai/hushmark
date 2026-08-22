@@ -77,6 +77,83 @@ def deterministic_balanced_epoch_indices(
     )
 
 
+def deterministic_replay_balanced_epoch_indices(
+    records: list[Mapping[str, Any]],
+    seed: int,
+    epoch_index: int,
+    *,
+    replay_source: str,
+    new_source: str,
+    replay_ratio: float,
+    maximum_weight: float = 4.0,
+    empty_weight: float = 0.25,
+) -> list[int]:
+    """Build a stable, source-balanced epoch with label balancing inside each source."""
+
+    if (
+        not records
+        or not replay_source
+        or not new_source
+        or replay_source == new_source
+        or not 0.0 < replay_ratio < 1.0
+        or maximum_weight < 1
+        or not 0 < empty_weight <= 1
+    ):
+        raise ValueError("replay sampling configuration is invalid")
+
+    grouped: dict[str, list[int]] = {replay_source: [], new_source: []}
+    for index, record in enumerate(records):
+        source = record.get("source")
+        if source not in grouped:
+            raise ValueError(f"replay corpus contains unexpected source: {source!r}")
+        grouped[str(source)].append(index)
+    if not all(grouped.values()):
+        raise ValueError("replay corpus must contain both configured sources")
+
+    def source_weights(indices: list[int]) -> list[float]:
+        label_counts: Counter[str] = Counter()
+        record_labels: list[set[str]] = []
+        for index in indices:
+            ner = records[index].get("ner")
+            if not isinstance(ner, list):
+                raise ValueError("replay sampling record has invalid NER spans")
+            labels = {
+                str(span[2])
+                for span in ner
+                if isinstance(span, list) and len(span) == 3 and isinstance(span[2], str)
+            }
+            record_labels.append(labels)
+            label_counts.update(labels)
+        if not label_counts:
+            raise ValueError("each replay source must contain at least one NER label")
+        most_common = max(label_counts.values())
+        return [
+            max(min(maximum_weight, most_common / label_counts[label]) for label in labels)
+            if labels
+            else empty_weight
+            for labels in record_labels
+        ]
+
+    total = len(records)
+    replay_count = round(total * replay_ratio)
+    new_count = total - replay_count
+    randomizer = random.Random(f"replay:{seed}:{epoch_index}")
+    selected = randomizer.choices(
+        grouped[replay_source],
+        weights=source_weights(grouped[replay_source]),
+        k=replay_count,
+    )
+    selected.extend(
+        randomizer.choices(
+            grouped[new_source],
+            weights=source_weights(grouped[new_source]),
+            k=new_count,
+        )
+    )
+    randomizer.shuffle(selected)
+    return selected
+
+
 def normalized_progress(
     *,
     epoch_index: int,

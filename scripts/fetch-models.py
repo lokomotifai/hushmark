@@ -6,16 +6,22 @@ from __future__ import annotations
 import hashlib
 import json
 import shutil
+import signal
 import sys
 import urllib.request
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 REGISTRY = ROOT / "core" / "models.yaml"
 MODEL_ROOT = ROOT / "models"
+DOWNLOAD_DEADLINE_SECONDS = 600
+SOCKET_TIMEOUT_SECONDS = 30
 
 
 def sha256_file(path: Path) -> str:
@@ -35,16 +41,87 @@ def validate_file(path: Path, spec: dict[str, Any]) -> bool:
     return sha256_file(path) == expected
 
 
+def embed_offline_encoder_config(
+    config: dict[str, Any], tokenizer_dir: Path, target_dir: Path
+) -> dict[str, Any]:
+    """Embed encoder architecture and write a complete local tokenizer config."""
+
+    if config.get("encoder_config") is None:
+        encoder_config_path = tokenizer_dir / "config.json"
+        encoder_config = json.loads(encoder_config_path.read_text(encoding="utf-8"))
+        if not isinstance(encoder_config.get("model_type"), str):
+            raise ValueError(f"encoder config is invalid: {encoder_config_path}")
+        config["encoder_config"] = encoder_config
+        if isinstance(encoder_config.get("vocab_size"), int):
+            config["vocab_size"] = encoder_config["vocab_size"]
+    runtime_encoder_config = config.get("encoder_config")
+    if not isinstance(runtime_encoder_config, dict):
+        raise ValueError(f"runtime encoder config is invalid: {target_dir.name}")
+    local_encoder_config = dict(runtime_encoder_config)
+    # Transformers 5 treats a local tokenizer with an unversioned config as
+    # potentially Mistral and applies an unrelated regex warning/fix.
+    local_encoder_config.setdefault("transformers_version", "5.0.0")
+    (target_dir / "config.json").write_text(
+        json.dumps(local_encoder_config, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    return config
+
+
 def download_file(url: str, target: Path, spec: dict[str, Any]) -> None:
+    expected_size = spec.get("size")
+    if not isinstance(expected_size, int) or expected_size <= 0:
+        raise ValueError(f"model file has no valid size declaration: {target.name}")
+    if urlparse(url).scheme != "https":
+        raise ValueError("model downloads require HTTPS")
     partial = target.with_suffix(target.suffix + ".partial")
+    partial.unlink(missing_ok=True)
     request = urllib.request.Request(url, headers={"User-Agent": "hushmark-bootstrap/0.1.1"})
-    with urllib.request.urlopen(request, timeout=600) as response, partial.open("wb") as output:
-        while chunk := response.read(1024 * 1024):
-            output.write(chunk)
-    if not validate_file(partial, spec):
-        partial.unlink(missing_ok=True)
-        raise ValueError(f"downloaded model file failed verification: {target.name}")
-    partial.replace(target)
+    completed = False
+    downloaded = 0
+    try:
+        with (
+            absolute_deadline(DOWNLOAD_DEADLINE_SECONDS),
+            urllib.request.urlopen(request, timeout=SOCKET_TIMEOUT_SECONDS) as response,
+            partial.open("xb") as output,
+        ):
+            if urlparse(response.geturl()).scheme != "https":
+                raise ValueError("model download redirected to a non-HTTPS URL")
+            declared_length = response.headers.get("Content-Length")
+            if declared_length is not None and int(declared_length) != expected_size:
+                raise ValueError(f"model download size declaration mismatch: {target.name}")
+            while chunk := response.read(1024 * 1024):
+                downloaded += len(chunk)
+                if downloaded > expected_size:
+                    raise ValueError(f"model download exceeded size limit: {target.name}")
+                output.write(chunk)
+        if downloaded != expected_size or not validate_file(partial, spec):
+            raise ValueError(f"downloaded model file failed verification: {target.name}")
+        partial.replace(target)
+        completed = True
+    finally:
+        if not completed:
+            partial.unlink(missing_ok=True)
+
+
+@contextmanager
+def absolute_deadline(seconds: int) -> Iterator[None]:
+    if not hasattr(signal, "SIGALRM") or not hasattr(signal, "setitimer"):
+        yield
+        return
+
+    def deadline_exceeded(_signum: int, _frame: object) -> None:
+        raise TimeoutError("model download exceeded absolute deadline")
+
+    previous_handler = signal.signal(signal.SIGALRM, deadline_exceeded)
+    previous_timer = signal.setitimer(signal.ITIMER_REAL, seconds)
+    try:
+        yield
+    finally:
+        signal.setitimer(signal.ITIMER_REAL, 0)
+        signal.signal(signal.SIGALRM, previous_handler)
+        if previous_timer[0] > 0:
+            signal.setitimer(signal.ITIMER_REAL, *previous_timer)
 
 
 def main() -> int:
@@ -58,8 +135,11 @@ def main() -> int:
         revision = model["revision"]
         target_dir = MODEL_ROOT / model_id
         distribution = model.get("distribution", "remote")
-        if distribution not in {"remote", "local-artifact"}:
+        if distribution not in {"remote", "local-artifact", "private-huggingface"}:
             raise ValueError(f"invalid model distribution: {model_id}")
+        if distribution == "private-huggingface":
+            print(f"skipping private model; run scripts/install-private-model.py: {model_id}")
+            continue
         local_artifact = distribution == "local-artifact"
         if local_artifact and not target_dir.is_dir():
             print(f"skipping unpublished local model artifact: {target_dir.relative_to(ROOT)}")
@@ -83,6 +163,8 @@ def main() -> int:
     for model in models:
         model_id = model["id"]
         target_dir = MODEL_ROOT / model_id
+        if model.get("distribution") == "private-huggingface":
+            continue
         if model.get("distribution") == "local-artifact" and not target_dir.is_dir():
             continue
         runtime_config = model.get("runtime_config")
@@ -99,6 +181,7 @@ def main() -> int:
                     if not validate_file(source, file_spec):
                         raise ValueError(f"tokenizer dependency failed verification: {source}")
                     shutil.copyfile(source, destination)
+            embed_offline_encoder_config(config, tokenizer_dir, target_dir)
             target_config.write_text(
                 json.dumps(config, ensure_ascii=False, indent=2) + "\n",
                 encoding="utf-8",
