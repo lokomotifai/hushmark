@@ -1,35 +1,25 @@
-"""Offline PyTorch GLiNER adapter."""
+"""Offline adapter for Hushmark's fixed-label BERTurk span model."""
 
 from __future__ import annotations
 
-import importlib
-from collections.abc import Mapping, Sequence
+import hashlib
 from hashlib import file_digest
 from pathlib import Path
-from typing import Protocol, cast
 
 from hushmark_core.ner.base import NerSpan
+from hushmark_core.ner.berturk_span import BerturkSpanModel
 from hushmark_core.ner.decode import decode_predictions
 from hushmark_core.ner.integrity import verify_runtime_artifacts
 from hushmark_core.ner.registry_types import ModelSpecLike
 
 
-class PredictingModel(Protocol):
-    def eval(self) -> PredictingModel: ...
+class BerturkNerBackend:
+    """Load and run a fully local, integrity-checked BERTurk artifact."""
 
-    def predict_entities(
-        self,
-        text: str,
-        labels: list[str],
-        threshold: float,
-    ) -> Sequence[Mapping[str, object]]: ...
-
-
-class TorchNerBackend:
     def __init__(self, *, model_dir: Path, spec: ModelSpecLike) -> None:
         self._model_dir = model_dir
         self._spec = spec
-        self._model: PredictingModel | None = None
+        self._model: BerturkSpanModel | None = None
         self._measured_sha256: str | None = None
         self._label_to_type = {label: entity_type for entity_type, label in spec.labels.items()}
 
@@ -44,27 +34,29 @@ class TorchNerBackend:
     def load(self) -> None:
         if self._model is not None:
             return
-        model_file = self._model_dir / self._spec.primary_file
-        if not model_file.is_file():
+        primary_file = self._model_dir / self._spec.primary_file
+        if not primary_file.is_file():
             raise FileNotFoundError(
-                f"model weights are not installed at {self._model_dir}; run scripts/fetch-models.py"
+                f"BERTurk model is not installed at {self._model_dir}; "
+                "run scripts/install-private-model.py"
             )
-        if model_file.stat().st_size != self._spec.size:
-            raise ValueError(f"PyTorch model size verification failed: {model_file}")
-        with model_file.open("rb") as model_stream:
+        verify_runtime_artifacts(self._model_dir, self._spec)
+        with primary_file.open("rb") as model_stream:
             measured_sha256 = file_digest(model_stream, "sha256").hexdigest()
         if measured_sha256 != self._spec.sha256:
-            raise ValueError(f"PyTorch model SHA-256 verification failed: {model_file}")
-        verify_runtime_artifacts(self._model_dir, self._spec)
-        self._measured_sha256 = measured_sha256
-        gliner_module = importlib.import_module("gliner")
-        gliner_class = gliner_module.GLiNER
-        model = gliner_class.from_pretrained(
-            str(self._model_dir),
-            local_files_only=True,
-            map_location="cpu",
+            raise ValueError(f"BERTurk primary model SHA-256 verification failed: {primary_file}")
+        artifact_manifest = "".join(
+            f"{sha256}  {filename}\n"
+            for filename, _size, sha256 in sorted(self._spec.runtime_files)
         )
-        self._model = cast(PredictingModel, model.eval())
+        artifact_sha256 = hashlib.sha256(artifact_manifest.encode()).hexdigest()
+        if artifact_sha256 != self._spec.artifact_sha256:
+            raise ValueError("BERTurk aggregate artifact SHA-256 does not match the registry")
+        model = BerturkSpanModel.load_artifact(self._model_dir, local_files_only=True)
+        if set(model.label_names) != set(self._label_to_type):
+            raise ValueError("BERTurk artifact labels do not match the pinned registry")
+        self._model = model.eval()
+        self._measured_sha256 = artifact_sha256
 
     def is_ready(self) -> bool:
         return self._model is not None

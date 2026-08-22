@@ -24,6 +24,16 @@ def test_legacy_backend_environment_alias(monkeypatch: pytest.MonkeyPatch) -> No
     get_settings.cache_clear()
 
 
+def test_private_berturk_backend_can_be_selected_explicitly() -> None:
+    settings = Settings(
+        ner_backend="berturk",
+        model_id="hushmark-berturk-112m",
+        allow_unauthenticated=True,
+    )
+    assert settings.ner_backend == "berturk"
+    assert settings.model_id == "hushmark-berturk-112m"
+
+
 def test_per_type_thresholds_are_closed_to_ner_taxonomy() -> None:
     assert Settings(ner_thresholds={"PERSON": 0.7}).ner_thresholds == {"PERSON": 0.7}
     with pytest.raises(ValidationError, match="unknown type"):

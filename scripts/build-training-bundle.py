@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build a deterministic, source-only AC-1 training bundle from an explicit allowlist."""
+"""Build a deterministic, source-only replay-training bundle from an explicit allowlist."""
 
 from __future__ import annotations
 
@@ -14,12 +14,13 @@ from collections.abc import Iterator
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = "0.1.1"
-BUNDLE_ROOT = f"hushmark-ac1-training-{VERSION}"
+VERSION = "0.2.0"
+BUNDLE_ROOT = f"hushmark-replay-training-{VERSION}"
 ROOT_FILES = (
     ".python-version",
     "README.md",
     "THIRD_PARTY_NOTICES.md",
+    "docs/train-berturk-runpod.md",
     "docs/train-runpod.md",
     "pyproject.toml",
     "uv.lock",
@@ -33,7 +34,9 @@ SOURCE_DIRECTORIES = (
 )
 SCRIPT_FILES = (
     "scripts/bootstrap-gpu.sh",
+    "scripts/fetch-berturk.py",
     "scripts/fetch-models.py",
+    "scripts/verify-training-data-bundle.py",
     "scripts/verify-training-bundle.py",
 )
 SKIP_NAMES = frozenset(
@@ -123,7 +126,7 @@ def build(output: Path) -> str:
         "schema_version": 1,
         "bundle": BUNDLE_ROOT,
         "version": VERSION,
-        "purpose": "AC-1 isolated GPU training",
+        "purpose": "Hushmark isolated replay GPU training",
         "files": [
             {"path": path, "sha256": sha256_bytes(content), "size": len(content)}
             for path, (content, _) in files.items()

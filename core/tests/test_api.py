@@ -45,7 +45,7 @@ def test_health_readiness_and_metadata() -> None:
         assert client.get("/readyz").json() == {"status": "ready"}
         metadata = client.get("/v1/metadata").json()
     assert metadata["model_id"] == "deterministic-v1"
-    assert metadata["backends"] == ["torch", "onnx"]
+    assert metadata["backends"] == ["torch", "onnx", "berturk"]
 
 
 def test_core_service_token_protects_value_bearing_routes(monkeypatch) -> None:

@@ -335,8 +335,131 @@ def load_prepared(path: Path) -> list[dict[str, Any]]:
             raise ValueError(f"invalid prepared record at line {line_number}")
         if not isinstance(raw.get("ner"), list) or not isinstance(raw.get("ner_labels"), list):
             raise ValueError(f"invalid GLiNER labels at line {line_number}")
+        tokens = raw["tokenized_text"]
+        labels = raw["ner_labels"]
+        if not all(isinstance(token, str) and token for token in tokens):
+            raise ValueError(f"invalid prepared tokens at line {line_number}")
+        if not all(isinstance(label, str) and label for label in labels):
+            raise ValueError(f"invalid prepared label names at line {line_number}")
+        for span in raw["ner"]:
+            if (
+                not isinstance(span, list)
+                or len(span) != 3
+                or not isinstance(span[0], int)
+                or not isinstance(span[1], int)
+                or not isinstance(span[2], str)
+                or not 0 <= span[0] <= span[1] < len(tokens)
+                or span[2] not in labels
+            ):
+                raise ValueError(f"invalid prepared span at line {line_number}")
         records.append(raw)
+    if not records:
+        raise ValueError("prepared dataset is empty")
     return records
+
+
+def prepared_required_max_width(records: Iterable[Mapping[str, Any]]) -> int:
+    """Return the widest inclusive gold span in a prepared GLiNER corpus."""
+
+    maximum = 1
+    seen = False
+    for record in records:
+        spans = record.get("ner")
+        if not isinstance(spans, list):
+            raise ValueError("prepared record has invalid NER spans")
+        for span in spans:
+            if (
+                not isinstance(span, list)
+                or len(span) != 3
+                or not isinstance(span[0], int)
+                or not isinstance(span[1], int)
+                or span[0] > span[1]
+            ):
+                raise ValueError("prepared record has an invalid token span")
+            maximum = max(maximum, span[1] - span[0] + 1)
+            seen = True
+    return maximum if seen else 1
+
+
+def load_validation_examples(path: Path, labels: Mapping[str, str]) -> list[dict[str, Any]]:
+    """Load raw character spans or reconstruct them from prepared GLiNER rows.
+
+    Prepared rows do not necessarily retain original whitespace. Reconstructing
+    with one space between tokens keeps every gold token span exact and makes the
+    documented prepared validation path usable for checkpoint selection.
+    """
+
+    lines = path.read_text(encoding="utf-8").splitlines()
+    if not lines:
+        raise ValueError("validation dataset is empty")
+    first = json.loads(lines[0])
+    if isinstance(first, dict) and isinstance(first.get("text"), str):
+        return load_dataset(path)
+
+    prepared = load_prepared(path)
+    label_to_type = {label: entity_type for entity_type, label in labels.items()}
+    examples: list[dict[str, Any]] = []
+    for line_number, record in enumerate(prepared, start=1):
+        tokens = record["tokenized_text"]
+        starts: list[int] = []
+        cursor = 0
+        for token in tokens:
+            starts.append(cursor)
+            cursor += len(token) + 1
+        text = " ".join(tokens)
+        entities: list[dict[str, Any]] = []
+        for first_token, last_token, model_label in record["ner"]:
+            entity_type = label_to_type.get(model_label)
+            if entity_type is None:
+                raise ValueError(
+                    f"prepared validation label {model_label!r} at line {line_number} "
+                    "is not part of the configured Hushmark taxonomy"
+                )
+            start = starts[first_token]
+            end = starts[last_token] + len(tokens[last_token])
+            entities.append(
+                {
+                    "type": entity_type,
+                    "start": start,
+                    "end": end,
+                    "text": text[start:end],
+                }
+            )
+        examples.append(
+            {
+                "id": str(record.get("id", f"prepared-validation-{line_number}")),
+                "text": text,
+                "entities": entities,
+            }
+        )
+    return examples
+
+
+def resolve_training_max_width(
+    model_dir: Path,
+    records: Iterable[Mapping[str, Any]],
+    *,
+    requested: int | None,
+) -> tuple[int, int]:
+    """Choose a lossless max width for the pinned span architecture."""
+
+    config = json.loads((model_dir / "gliner_config.json").read_text(encoding="utf-8"))
+    configured = config.get("max_width")
+    if not isinstance(configured, int) or configured < 1:
+        raise ValueError("base model has an invalid max_width")
+    required = prepared_required_max_width(records)
+    effective = max(configured, required) if requested is None else requested
+    if effective < required:
+        raise ValueError(
+            f"max_width={effective} cannot represent the widest gold span ({required} tokens)"
+        )
+    if effective < 1:
+        raise ValueError("max_width must be positive")
+    if effective != configured and config.get("span_mode") != "markerV0":
+        raise ValueError(
+            "automatic max_width expansion is supported only for the pinned markerV0 architecture"
+        )
+    return effective, required
 
 
 def sha256_file(path: Path) -> str:
@@ -425,6 +548,83 @@ def adoption_verdict(
         "incumbent_ner_macro_f1": incumbent_macro,
         "improvement": improvement,
         "per_type_regressions": dict(sorted(regressions.items())),
+        "reasons": reasons,
+    }
+
+
+def supplemental_adoption_verdict(
+    candidate: Mapping[str, Any],
+    incumbent: Mapping[str, Any],
+    *,
+    entity_types: Iterable[str],
+    eligible: bool,
+    minimum_macro_f1_improvement: float = 0.05,
+    maximum_per_type_regression: float = 0.02,
+    maximum_empty_gold_fp_increase: int = 0,
+) -> dict[str, Any]:
+    """Gate a new-data holdout without weakening the legacy locked-benchmark rule."""
+
+    scoped_types = tuple(sorted(set(entity_types)))
+    if not scoped_types or not set(scoped_types).issubset(NER_TYPES):
+        raise ValueError("supplemental gate requires supported closed-taxonomy NER types")
+
+    def scores(report: Mapping[str, Any]) -> dict[str, float]:
+        per_type = report["strict"]["per_type"]
+        result: dict[str, float] = {}
+        for entity_type in scoped_types:
+            metrics = per_type.get(entity_type)
+            if not isinstance(metrics, Mapping) or int(metrics.get("support", 0)) <= 0:
+                raise ValueError(f"supplemental result has no support for {entity_type}")
+            result[entity_type] = float(metrics["f1"])
+        return result
+
+    candidate_scores = scores(candidate)
+    incumbent_scores = scores(incumbent)
+    candidate_macro = sum(candidate_scores.values()) / len(candidate_scores)
+    incumbent_macro = sum(incumbent_scores.values()) / len(incumbent_scores)
+    improvement = candidate_macro - incumbent_macro
+    regressions = {
+        entity_type: incumbent_scores[entity_type] - candidate_scores[entity_type]
+        for entity_type in scoped_types
+        if incumbent_scores[entity_type] - candidate_scores[entity_type]
+        > maximum_per_type_regression
+    }
+    candidate_empty_fp = int(candidate["empty_gold"]["false_positive_spans"])
+    incumbent_empty_fp = int(incumbent["empty_gold"]["false_positive_spans"])
+    empty_fp_increase = candidate_empty_fp - incumbent_empty_fp
+    technical_pass = (
+        improvement >= minimum_macro_f1_improvement
+        and not regressions
+        and empty_fp_increase <= maximum_empty_gold_fp_increase
+    )
+    reasons: list[str] = []
+    if not eligible:
+        reasons.append("legacy locked-benchmark verdict did not authorize adoption")
+    if improvement < minimum_macro_f1_improvement:
+        reasons.append("new-holdout NER macro-F1 improvement is below the required minimum")
+    if regressions:
+        reasons.append("one or more new-holdout NER types regress beyond the allowed limit")
+    if empty_fp_increase > maximum_empty_gold_fp_increase:
+        reasons.append("false-positive spans on empty-gold documents increased")
+    if eligible and technical_pass:
+        reasons.append("candidate satisfies both legacy and new-holdout adoption gates")
+    return {
+        "adopt": eligible and technical_pass,
+        "eligible": eligible,
+        "technical_pass": technical_pass,
+        "entity_types": list(scoped_types),
+        "rule": {
+            "minimum_ner_macro_f1_improvement": minimum_macro_f1_improvement,
+            "maximum_per_type_strict_f1_regression": maximum_per_type_regression,
+            "maximum_empty_gold_false_positive_span_increase": maximum_empty_gold_fp_increase,
+        },
+        "candidate_ner_macro_f1": candidate_macro,
+        "incumbent_ner_macro_f1": incumbent_macro,
+        "improvement": improvement,
+        "per_type_regressions": dict(sorted(regressions.items())),
+        "candidate_empty_gold_false_positive_spans": candidate_empty_fp,
+        "incumbent_empty_gold_false_positive_spans": incumbent_empty_fp,
+        "empty_gold_false_positive_span_increase": empty_fp_increase,
         "reasons": reasons,
     }
 

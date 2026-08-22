@@ -8,6 +8,7 @@ from hushmark_bench.training_state import (
     atomic_write_json,
     deterministic_balanced_epoch_indices,
     deterministic_epoch_indices,
+    deterministic_replay_balanced_epoch_indices,
     normalized_progress,
     prune_checkpoints,
     resolve_resume_checkpoint,
@@ -36,6 +37,41 @@ def test_balanced_epoch_sampling_is_deterministic_and_favors_rare_labels() -> No
     empty = sum(index >= 90 for index in first)
     assert rare > 10
     assert empty < 10
+
+
+def test_replay_sampling_enforces_source_ratio_and_is_deterministic() -> None:
+    records = [
+        *({"source": "legacy", "ner": [[0, 0, "person"]]} for _ in range(80)),
+        *({"source": "new", "ner": [[0, 0, "full address"]]} for _ in range(20)),
+    ]
+    first = deterministic_replay_balanced_epoch_indices(
+        records,
+        20260809,
+        0,
+        replay_source="legacy",
+        new_source="new",
+        replay_ratio=0.5,
+    )
+    second = deterministic_replay_balanced_epoch_indices(
+        records,
+        20260809,
+        0,
+        replay_source="legacy",
+        new_source="new",
+        replay_ratio=0.5,
+    )
+    assert first == second
+    assert len(first) == len(records)
+    assert sum(records[index]["source"] == "legacy" for index in first) == 50
+    assert sum(records[index]["source"] == "new" for index in first) == 50
+    assert first != deterministic_replay_balanced_epoch_indices(
+        records,
+        20260809,
+        1,
+        replay_source="legacy",
+        new_source="new",
+        replay_ratio=0.5,
+    )
 
 
 def test_progress_normalizes_end_of_epoch() -> None:

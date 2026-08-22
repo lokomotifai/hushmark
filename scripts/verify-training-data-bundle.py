@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify an extracted replay-training bundle before executing bundled code."""
+"""Verify an extracted Hushmark replay-data bundle before it is consumed."""
 
 from __future__ import annotations
 
@@ -8,8 +8,6 @@ import json
 from pathlib import Path
 
 ROOT = Path.cwd().resolve()
-FORBIDDEN_SEGMENTS = frozenset({"briefs", "hushmark", "research"})
-FORBIDDEN_FILES = frozenset({"EXECUTABLE-PLAN-PROMPT.md", "PLAN-BRIEF.md", "PLAN.md"})
 
 
 def sha256_file(path: Path) -> str:
@@ -21,16 +19,14 @@ def sha256_file(path: Path) -> str:
 
 
 def main() -> int:
-    checksum_path = ROOT / "SHA256SUMS"
-    manifest_path = ROOT / "BUNDLE-MANIFEST.json"
-    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    if manifest.get("purpose") != "Hushmark isolated replay GPU training":
-        raise ValueError("unexpected bundle purpose")
-
+    manifest = json.loads((ROOT / "BUNDLE-MANIFEST.json").read_text(encoding="utf-8"))
+    if manifest.get("purpose") != "Hushmark approved replay fine-tuning data":
+        raise ValueError("unexpected training data bundle purpose")
     expected: dict[str, str] = {}
-    for line in checksum_path.read_text(encoding="utf-8").splitlines():
+    for line in (ROOT / "SHA256SUMS").read_text(encoding="utf-8").splitlines():
         digest, relative = line.split("  ", maxsplit=1)
         expected[relative] = digest
+
     actual: set[str] = set()
     canary = ("HUSHMARK-CORPUS-" + "CANARY-7f3a9d").encode()
     for path in sorted(ROOT.rglob("*")):
@@ -41,21 +37,16 @@ def main() -> int:
         relative = path.relative_to(ROOT).as_posix()
         if relative == "SHA256SUMS":
             continue
-        if Path(relative).name in FORBIDDEN_FILES or any(
-            part in FORBIDDEN_SEGMENTS for part in Path(relative).parts
-        ):
-            raise ValueError(f"bundle contains a forbidden private path: {relative}")
-        if canary in path.read_bytes():
-            raise ValueError(f"bundle contains the private corpus canary: {relative}")
         if relative not in expected:
             raise ValueError(f"bundle contains an unlisted file: {relative}")
+        if canary in path.read_bytes():
+            raise ValueError(f"private corpus canary found in bundle: {relative}")
         if sha256_file(path) != expected[relative]:
             raise ValueError(f"bundle checksum mismatch: {relative}")
         actual.add(relative)
     if actual != set(expected):
-        missing = sorted(set(expected) - actual)
-        raise ValueError(f"bundle is missing listed files: {missing}")
-    print(f"verified {len(actual)} allowlisted files in {ROOT}")
+        raise ValueError(f"bundle is missing listed files: {sorted(set(expected) - actual)}")
+    print(f"verified {len(actual)} allowlisted training data files in {ROOT}")
     return 0
 
 

@@ -14,11 +14,15 @@ from hushmark_bench.training import (
     development_examples,
     full_training_examples,
     load_model_labels,
+    load_validation_examples,
     normalize_ai4privacy_record,
     prepare_hushmark_records,
     prepare_jsonl,
     prepare_record,
+    prepared_required_max_width,
+    resolve_training_max_width,
     smoke_records,
+    supplemental_adoption_verdict,
     synthesize,
 )
 
@@ -215,6 +219,32 @@ def test_adoption_rule_requires_gain_no_regression_and_eligibility() -> None:
     assert smoke["adopt"] is False
 
 
+def test_supplemental_adoption_gate_requires_gain_and_no_new_negative_fp() -> None:
+    def report(scores: dict[str, float], false_positives: int) -> dict[str, Any]:
+        return {
+            "strict": {
+                "per_type": {
+                    entity_type: {"support": 1, "f1": score}
+                    for entity_type, score in scores.items()
+                }
+            },
+            "empty_gold": {"false_positive_spans": false_positives},
+        }
+
+    types = ("PERSON", "ADDRESS", "DOB")
+    incumbent = report(dict.fromkeys(types, 0.50), 4)
+    passing = supplemental_adoption_verdict(
+        report(dict.fromkeys(types, 0.56), 4), incumbent, entity_types=types, eligible=True
+    )
+    assert passing["adopt"] is True
+
+    noisier = supplemental_adoption_verdict(
+        report(dict.fromkeys(types, 0.60), 5), incumbent, entity_types=types, eligible=True
+    )
+    assert noisier["technical_pass"] is False
+    assert noisier["empty_gold_false_positive_span_increase"] == 1
+
+
 def test_ai4privacy_adapter_rejects_bad_offsets() -> None:
     with pytest.raises(ValueError, match="invalid offsets"):
         normalize_ai4privacy_record(
@@ -235,3 +265,53 @@ def test_ai4privacy_adapter_rejects_mismatched_value() -> None:
                 "privacy_mask": [{"start": 0, "end": 5, "label": "GIVENNAME", "value": "Ayşe"}],
             }
         )
+
+
+def test_prepared_validation_is_reconstructed_with_exact_gold_offsets(tmp_path: Path) -> None:
+    labels = load_model_labels(ROOT / "core/models.yaml")
+    path = tmp_path / "validation.jsonl"
+    path.write_text(
+        json.dumps(
+            {
+                "id": "prepared-1",
+                "source": "test",
+                "tokenized_text": ["Ayşe", "Yılmaz", "Ankara", "'", "da"],
+                "ner": [[0, 1, "person"], [2, 4, "full address"]],
+                "ner_labels": list(labels.values()),
+            },
+            ensure_ascii=False,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    examples = load_validation_examples(path, labels)
+    assert examples == [
+        {
+            "id": "prepared-1",
+            "text": "Ayşe Yılmaz Ankara ' da",
+            "entities": [
+                {"type": "PERSON", "start": 0, "end": 11, "text": "Ayşe Yılmaz"},
+                {"type": "ADDRESS", "start": 12, "end": 23, "text": "Ankara ' da"},
+            ],
+        }
+    ]
+
+
+def test_training_width_expands_losslessly_for_marker_v0(tmp_path: Path) -> None:
+    model_dir = tmp_path / "model"
+    model_dir.mkdir()
+    (model_dir / "gliner_config.json").write_text(
+        json.dumps({"max_width": 12, "span_mode": "markerV0"}),
+        encoding="utf-8",
+    )
+    records = [
+        {
+            "tokenized_text": [str(index) for index in range(16)],
+            "ner": [[0, 15, "full address"]],
+            "ner_labels": ["full address"],
+        }
+    ]
+    assert prepared_required_max_width(records) == 16
+    assert resolve_training_max_width(model_dir, records, requested=None) == (16, 16)
+    with pytest.raises(ValueError, match="widest gold span"):
+        resolve_training_max_width(model_dir, records, requested=12)

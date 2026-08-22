@@ -8,6 +8,7 @@ from hushmark_bench.training import NER_TYPES, development_examples, load_model_
 from hushmark_bench.validation import (
     validate_ner_model,
     validate_ner_model_batched,
+    validate_ner_suites,
     validate_ner_thresholds,
     validation_rank,
 )
@@ -46,6 +47,39 @@ def test_development_validation_scores_only_ner_types() -> None:
     assert report["examples"] == len(examples)
     assert report["ner_macro_f1"] == 1.0
     assert set(report["strict"]["per_type"]) == set(NER_TYPES)
+    assert report["partial"]["micro"]["f1"] == 1.0
+    assert report["empty_gold"] == {
+        "documents": sum(
+            not any(entity["type"] in NER_TYPES for entity in example["entities"])
+            for example in examples
+        ),
+        "documents_with_false_positives": 0,
+        "false_positive_spans": 0,
+    }
+
+
+def test_validation_suites_preserve_domain_reports_and_combine_counts() -> None:
+    labels = load_model_labels(ROOT / "core/models.yaml")
+    legacy = [asdict(example) for example in development_examples(20260809)]
+    new = [
+        {
+            "text": "Yeni örnek: Ayşe",
+            "entities": [{"type": "PERSON", "start": 12, "end": 16, "text": "Ayşe"}],
+        }
+    ]
+    examples = [*legacy, *new]
+    report = validate_ner_suites(
+        GoldModel(examples, labels),
+        {"legacy": legacy, "new": new},
+        labels,
+        threshold=0.5,
+    )
+    assert report["examples"] == len(examples)
+    assert report["ner_macro_f1"] == 1.0
+    assert report["suites"]["new"]["supported_types"] == ["PERSON"]
+    assert report["strict"]["per_type"]["PERSON"]["support"] == (
+        report["suites"]["legacy"]["strict"]["per_type"]["PERSON"]["support"] + 1
+    )
 
 
 def test_validation_rank_prefers_technical_pass_before_raw_macro() -> None:
@@ -142,3 +176,48 @@ def test_validate_batched_uses_one_model_call() -> None:
 
     assert model.calls == 1
     assert report["ner_macro_f1"] == 1.0
+    assert report["empty_gold"] == {
+        "documents": 0,
+        "documents_with_false_positives": 0,
+        "false_positive_spans": 0,
+    }
+
+
+def test_validate_batched_allows_a_supported_taxonomy_subset() -> None:
+    labels = load_model_labels(ROOT / "core/models.yaml")
+
+    class PersonModel:
+        def inference(self, texts, model_labels, *, threshold, batch_size):
+            assert set(model_labels) == set(labels.values())
+            return [[{"label": labels["PERSON"], "start": 0, "end": 4, "score": 0.9}]]
+
+    report = validate_ner_model_batched(
+        PersonModel(),
+        [{"text": "Ayşe", "entities": [{"type": "PERSON", "start": 0, "end": 4}]}],
+        labels,
+        threshold=0.4,
+        batch_size=8,
+    )
+    assert report["strict"]["per_type"]["PERSON"]["support"] == 1
+    assert report["ner_macro_f1"] == 1.0
+
+
+def test_validate_batched_counts_empty_gold_false_positives() -> None:
+    labels = load_model_labels(ROOT / "core/models.yaml")
+
+    class NoisyModel:
+        def inference(self, texts, model_labels, *, threshold, batch_size):
+            return [[{"label": labels["PERSON"], "start": 0, "end": 4, "score": 0.9}]]
+
+    report = validate_ner_model_batched(
+        NoisyModel(),
+        [{"text": "Ayşe", "entities": []}],
+        labels,
+        threshold=0.4,
+        batch_size=8,
+    )
+    assert report["empty_gold"] == {
+        "documents": 1,
+        "documents_with_false_positives": 1,
+        "false_positive_spans": 1,
+    }

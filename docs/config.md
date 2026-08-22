@@ -7,24 +7,24 @@ Secrets should come from a secret manager or Kubernetes Secret, never a committe
 
 ## Core
 
-| Variable                              | Default / requirement     | Meaning                                         |
-| ------------------------------------- | ------------------------- | ----------------------------------------------- |
-| `HUSHMARK_CORE_ALLOW_UNAUTHENTICATED` | `False`                   | Validated core `allow_unauthenticated` setting. |
-| `HUSHMARK_CORE_BODY_LIMIT_BYTES`      | `1048576`                 | Validated core `body_limit_bytes` setting.      |
-| `HUSHMARK_CORE_HOST`                  | `127.0.0.1`               | Validated core `host` setting.                  |
-| `HUSHMARK_CORE_LOG_LEVEL`             | `info`                    | Validated core `log_level` setting.             |
-| `HUSHMARK_CORE_MAX_CONCURRENCY`       | `4`                       | Validated core `max_concurrency` setting.       |
-| `HUSHMARK_CORE_MODEL_ID`              | `hushmark-tr`             | Validated core `model_id` setting.              |
-| `HUSHMARK_CORE_MODEL_REGISTRY`        | `<repo>/core/models.yaml` | Validated core `model_registry` setting.        |
-| `HUSHMARK_CORE_MODEL_ROOT`            | `<repo>/models`           | Validated core `model_root` setting.            |
-| `HUSHMARK_CORE_NER_BACKEND`           | `torch`                   | Validated core `ner_backend` setting.           |
-| `HUSHMARK_CORE_NER_THRESHOLD`         | `0.55`                    | Validated core `ner_threshold` setting.         |
-| `HUSHMARK_CORE_NER_THRESHOLDS`        | `dynamic`                 | Validated core `ner_thresholds` setting.        |
-| `HUSHMARK_CORE_ONNX_MODEL_FILE`       | `model.onnx`              | Validated core `onnx_model_file` setting.       |
-| `HUSHMARK_CORE_PORT`                  | `8000`                    | Validated core `port` setting.                  |
-| `HUSHMARK_CORE_QUEUE_TIMEOUT_MS`      | `250`                     | Validated core `queue_timeout_ms` setting.      |
-| `HUSHMARK_CORE_SERVICE_TOKEN`         | `None`                    | Validated core `service_token` setting.         |
-| `HUSHMARK_CORE_SERVICE_TOKEN_FILE`    | `None`                    | Validated core `service_token_file` setting.    |
+| Variable                              | Default / requirement     | Meaning                                                       |
+| ------------------------------------- | ------------------------- | ------------------------------------------------------------- |
+| `HUSHMARK_CORE_ALLOW_UNAUTHENTICATED` | `False`                   | Validated core `allow_unauthenticated` setting.               |
+| `HUSHMARK_CORE_BODY_LIMIT_BYTES`      | `1048576`                 | Validated core `body_limit_bytes` setting.                    |
+| `HUSHMARK_CORE_HOST`                  | `127.0.0.1`               | Validated core `host` setting.                                |
+| `HUSHMARK_CORE_LOG_LEVEL`             | `info`                    | Validated core `log_level` setting.                           |
+| `HUSHMARK_CORE_MAX_CONCURRENCY`       | `4`                       | Validated core `max_concurrency` setting.                     |
+| `HUSHMARK_CORE_MODEL_ID`              | `hushmark-tr`             | Validated core `model_id` setting.                            |
+| `HUSHMARK_CORE_MODEL_REGISTRY`        | `<repo>/core/models.yaml` | Validated core `model_registry` setting.                      |
+| `HUSHMARK_CORE_MODEL_ROOT`            | `<repo>/models`           | Validated core `model_root` setting.                          |
+| `HUSHMARK_CORE_NER_BACKEND`           | `torch`                   | NER backend: disabled, torch GLiNER, onnx GLiNER, or berturk. |
+| `HUSHMARK_CORE_NER_THRESHOLD`         | `0.55`                    | Validated core `ner_threshold` setting.                       |
+| `HUSHMARK_CORE_NER_THRESHOLDS`        | `dynamic`                 | Validated core `ner_thresholds` setting.                      |
+| `HUSHMARK_CORE_ONNX_MODEL_FILE`       | `model.onnx`              | Validated core `onnx_model_file` setting.                     |
+| `HUSHMARK_CORE_PORT`                  | `8000`                    | Validated core `port` setting.                                |
+| `HUSHMARK_CORE_QUEUE_TIMEOUT_MS`      | `250`                     | Validated core `queue_timeout_ms` setting.                    |
+| `HUSHMARK_CORE_SERVICE_TOKEN`         | `None`                    | Validated core `service_token` setting.                       |
+| `HUSHMARK_CORE_SERVICE_TOKEN_FILE`    | `None`                    | Validated core `service_token_file` setting.                  |
 
 ## Gateway
 

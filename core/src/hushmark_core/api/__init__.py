@@ -228,7 +228,7 @@ async def metadata() -> MetadataResponse:
         model_id=engine.model_id,
         model_sha256=engine.model_sha256,
         taxonomy_version=str(TAXONOMY_VERSION),
-        backends=["torch", "onnx"],
+        backends=["torch", "onnx", "berturk"],
     )
 
 

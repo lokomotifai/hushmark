@@ -56,11 +56,11 @@
           "type": "object",
           "additionalProperties": false,
           "required": ["baked", "existingClaim"],
-          "properties": { "baked": { "type": "boolean" }, "existingClaim": { "type": "string" } }
+          "properties": { "baked": { "type": "boolean" }, "existingClaim": { "type": "string" }, "id": { "type": "string", "minLength": 1 } }
         },
         "service": { "$ref": "#/$defs/service" },
         "resources": { "$ref": "#/$defs/resources" },
-        "nerBackend": { "enum": ["disabled", "torch", "onnx"] },
+        "nerBackend": { "enum": ["disabled", "torch", "onnx", "berturk"] },
         "nerThreshold": { "type": "number", "minimum": 0, "maximum": 1 },
         "bodyLimitBytes": { "type": "integer", "minimum": 1, "maximum": 16777216 },
         "maxConcurrency": { "type": "integer", "minimum": 1, "maximum": 128 },
