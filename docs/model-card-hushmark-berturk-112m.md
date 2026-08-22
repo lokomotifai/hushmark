@@ -10,18 +10,18 @@ anlamına gelmez.
 
 ## Değişmez kimlik
 
-| Alan | Değer |
-| --- | --- |
-| Hugging Face | [`lokomotifai/hushmark-berturk-112m`](https://huggingface.co/lokomotifai/hushmark-berturk-112m) (private) |
-| HF revision | `49ed7596936fd1ba28a26b788abcfb8c7b963a5c` |
-| Parametre | `112.422.957` |
-| Ana encoder dosyası | `encoder/model.safetensors` |
-| Ana SHA-256 | `a2426b32e90cc97909bcdb1e8518d0bfd5fbf6e7d4e9401565a389fb23807d2f` |
-| Span head SHA-256 | `49606104c71b9f10bac64086e43e6c528dd50566a18131bdd419ed7634e32af6` |
-| Runtime artifact SHA-256 | `ce319a22f131fd62b49df85261fb33c1dff871c075f3bc37d2d3be0fb9db383a` |
-| Maksimum giriş | 256 BERT subword token |
-| Maksimum span | 24 kelime birimi |
-| Önerilen eşik | `0.50` |
+| Alan                     | Değer                                                                                                     |
+| ------------------------ | --------------------------------------------------------------------------------------------------------- |
+| Hugging Face             | [`lokomotifai/hushmark-berturk-112m`](https://huggingface.co/lokomotifai/hushmark-berturk-112m) (private) |
+| HF revision              | `49ed7596936fd1ba28a26b788abcfb8c7b963a5c`                                                                |
+| Parametre                | `112.422.957`                                                                                             |
+| Ana encoder dosyası      | `encoder/model.safetensors`                                                                               |
+| Ana SHA-256              | `a2426b32e90cc97909bcdb1e8518d0bfd5fbf6e7d4e9401565a389fb23807d2f`                                        |
+| Span head SHA-256        | `49606104c71b9f10bac64086e43e6c528dd50566a18131bdd419ed7634e32af6`                                        |
+| Runtime artifact SHA-256 | `ce319a22f131fd62b49df85261fb33c1dff871c075f3bc37d2d3be0fb9db383a`                                        |
+| Maksimum giriş           | 256 BERT subword token                                                                                    |
+| Maksimum span            | 24 kelime birimi                                                                                          |
+| Önerilen eşik            | `0.50`                                                                                                    |
 
 Altı gerekli runtime dosyasının boyut ve SHA-256 değerleri `core/models.yaml` içinde
 sabitlenmiştir. Ağırlıklar ve eğitim verisi GitHub'a eklenmez.
@@ -71,12 +71,12 @@ dosyalarındadır.
 
 ## Kilitli değerlendirme
 
-| Set | BERTurk 112M | `hushmark-tr` 289M |
-| --- | ---: | ---: |
-| Eski 12-tip strict macro F1 | `1.000000` | `0.994124` |
-| Yeni PERSON/ADDRESS/DOB strict macro F1 | `0.975286` | `0.536787` |
-| Yeni micro F1 | `0.986301` | `0.617954` |
-| Yeni boş belgelerde yanlış pozitif span | `37` | `545` |
+| Set                                     | BERTurk 112M | `hushmark-tr` 289M |
+| --------------------------------------- | -----------: | -----------------: |
+| Eski 12-tip strict macro F1             |   `1.000000` |         `0.994124` |
+| Yeni PERSON/ADDRESS/DOB strict macro F1 |   `0.975286` |         `0.536787` |
+| Yeni micro F1                           |   `0.986301` |         `0.617954` |
+| Yeni boş belgelerde yanlış pozitif span |         `37` |              `545` |
 
 Yeni sette aday `PERSON=1.0`, `ADDRESS=1.0`, `DOB=0.925859` üretti. Buna rağmen resmî
 `adopt=false` kararı korunmuştur: önceden tanımlanmış legacy kuralı mutlak `+0.05` iyileşme
