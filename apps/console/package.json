@@ -30,6 +30,6 @@
     "@playwright/test": "1.62.0",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
-    "vitest": "^4.0.18"
+    "vitest": "^4.1.11"
   }
 }
