@@ -48,6 +48,6 @@
   "devDependencies": {
     "ai": "7.0.40",
     "tsup": "^8.5.1",
-    "vitest": "^4.0.18"
+    "vitest": "^4.1.11"
   }
 }
