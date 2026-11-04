@@ -26,7 +26,7 @@
     "fastify": "^5.8.0",
     "undici": "^7.16.0",
     "yaml": "^2.8.1",
-    "zod": "^4.3.5"
+    "zod": "^4.6.6"
   },
   "devDependencies": {
     "fast-check": "^4.3.0",
